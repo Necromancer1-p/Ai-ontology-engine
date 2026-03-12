@@ -2,28 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Activity, Database, Zap, RefreshCw, 
   Info, AlertCircle, CheckCircle2, Globe, Server, 
-  Layers, ChevronRight, Share2
+  Layers, ChevronRight 
 } from 'lucide-react';
 
 /**
  * KnowledgeGraph Component
- * Optimized for high-density visualization and stable layout.
+ * High-performance SVG-based force simulation for graph visualization.
  */
 const KnowledgeGraph = ({ data }) => {
   const [nodes, setNodes] = useState([]);
   const [links, setLinks] = useState([]);
 
   useEffect(() => {
-    if (!data.nodes || data.nodes.length === 0) {
-      setNodes([]);
-      setLinks([]);
-      return;
-    }
+    if (!data.nodes || data.nodes.length === 0) return;
 
+    // Initial positioning with controlled spread
     const initialNodes = data.nodes.map((node) => ({
       ...node,
-      x: 400 + (Math.random() - 0.5) * 300,
-      y: 300 + (Math.random() - 0.5) * 200,
+      x: 400 + (Math.random() - 0.5) * 400,
+      y: 300 + (Math.random() - 0.5) * 300,
       vx: 0,
       vy: 0
     }));
@@ -37,14 +34,14 @@ const KnowledgeGraph = ({ data }) => {
         if (prevNodes.length === 0) return prevNodes;
         const newNodes = prevNodes.map(n => ({ ...n }));
         
-        // 1. Repulsion
+        // 1. Repulsion Logic (Charge)
         for (let i = 0; i < newNodes.length; i++) {
           for (let j = i + 1; j < newNodes.length; j++) {
             const dx = newNodes[i].x - newNodes[j].x;
             const dy = newNodes[i].y - newNodes[j].y;
             const distSq = dx * dx + dy * dy || 1;
             const dist = Math.sqrt(distSq);
-            const force = Math.min(800, 8000 / distSq);
+            const force = Math.min(600, 7500 / distSq);
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
             newNodes[i].vx += fx;
@@ -54,7 +51,7 @@ const KnowledgeGraph = ({ data }) => {
           }
         }
 
-        // 2. Attraction
+        // 2. Attraction Logic (Springs/Links)
         data.links?.forEach(link => {
           const source = newNodes.find(n => n.id === link.source);
           const target = newNodes.find(n => n.id === link.target);
@@ -62,7 +59,7 @@ const KnowledgeGraph = ({ data }) => {
             const dx = target.x - source.x;
             const dy = target.y - source.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const force = (dist - 140) * 0.06;
+            const force = (dist - 160) * 0.06;
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
             source.vx += fx;
@@ -76,8 +73,8 @@ const KnowledgeGraph = ({ data }) => {
         newNodes.forEach(n => {
           const gx = (400 - n.x) * 0.05;
           const gy = (300 - n.y) * 0.05;
-          n.vx = (n.vx + gx) * 0.7;
-          n.vy = (n.vy + gy) * 0.7;
+          n.vx = (n.vx + gx) * 0.72;
+          n.vy = (n.vy + gy) * 0.72;
           n.x += n.vx;
           n.y += n.vy;
         });
@@ -115,15 +112,15 @@ const KnowledgeGraph = ({ data }) => {
               <line
                 x1={s.x} y1={s.y}
                 x2={t.x} y2={t.y}
-                stroke="rgba(79, 70, 229, 0.3)"
-                strokeWidth="2"
+                stroke="rgba(99, 102, 241, 0.25)"
+                strokeWidth="2.5"
                 strokeDasharray="4 2"
               />
               <text
                 x={(s.x + t.x) / 2}
                 y={(s.y + t.y) / 2 - 8}
                 fill="rgba(148, 163, 184, 0.8)"
-                className="text-[10px] font-bold select-none pointer-events-none"
+                className="text-[10px] font-bold select-none pointer-events-none uppercase tracking-widest"
                 textAnchor="middle"
               >
                 {link.label}
@@ -177,7 +174,7 @@ export default function App() {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [topic, setTopic] = useState('');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('Checking connectivity...');
+  const [status, setStatus] = useState('Initializing network sync...');
   const [isOnline, setIsOnline] = useState(false);
 
   const API_BASE = "http://localhost:5000/api";
@@ -192,20 +189,15 @@ export default function App() {
       setStatus('System Operational');
     } catch (err) {
       setIsOnline(false);
-      setStatus('Backend Service Offline');
+      setStatus('Service Offline');
       if (graphData.nodes.length === 0) {
         setGraphData({
           nodes: [
-            {id: "USA", group: "Location"},
-            {id: "Gemini", group: "Concept"},
-            {id: "Google", group: "Organization"},
-            {id: "India", group: "Location"}
+            {id: "Intelligence", group: "Concept"}, 
+            {id: "Neo4j Cluster", group: "Organization"}, 
+            {id: "Global Hub", group: "Location"}
           ],
-          links: [
-            {source: "Google", target: "Gemini", label: "DEVELOPS"},
-            {source: "Gemini", target: "USA", label: "HOSTED_IN"},
-            {source: "Gemini", target: "India", label: "SERVES"}
-          ]
+          links: [{source: "Intelligence", target: "Neo4j Cluster", label: "INDEXED_BY"}]
         });
       }
     }
@@ -213,146 +205,144 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+    const timer = setInterval(fetchData, 4000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleIngest = async (e) => {
     e.preventDefault();
     if (!topic || !isOnline) return;
     setLoading(true);
-    setStatus('AI Brain Processing...');
+    setStatus('AI Pipeline extracting entities...');
     try {
       const res = await fetch(`${API_BASE}/ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic })
       });
+      const result = await res.json();
       if (res.ok) {
-        setStatus('Ontology Enhanced!');
+        setStatus('Knowledge Graph synchronized.');
         setTopic('');
         fetchData();
-      } else { setStatus('Ingestion Failed'); }
-    } catch (e) { setStatus('Connection Lost'); }
+      } else { setStatus(`Error: ${result.error}`); }
+    } catch (e) { setStatus('Connection error detected'); }
     finally { setLoading(false); }
   };
 
   return (
-    <div className="flex h-screen bg-[#020617] text-slate-100 font-sans overflow-hidden">
-      {/* Refined Sidebar */}
-      <aside className="w-80 flex-shrink-0 bg-[#070b14] border-r border-white/5 flex flex-col shadow-2xl z-30 overflow-hidden">
+    <div className="flex h-screen bg-[#020617] text-slate-200 font-sans overflow-hidden" style={{ display: 'flex' }}>
+      {/* SIDEBAR CONTROL PANEL */}
+      <aside 
+        className="bg-[#070b14] border-r border-white/5 flex flex-col shadow-2xl z-30"
+        style={{ width: '320px', height: '100vh', flexShrink: 0, overflowY: 'auto' }}
+      >
         <div className="p-8 pb-10">
-          <div className="flex items-center gap-4 mb-2">
+          <div className="flex items-center gap-4 mb-2" style={{ display: 'flex', alignItems: 'center' }}>
             <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-600/30">
               <Zap className="w-7 h-7 text-white" fill="currentColor" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tighter text-white leading-none">GRAPH.AI</h1>
-              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] mt-2">Ontology Suite</p>
+              <h1 className="text-2xl font-black tracking-tighter text-white leading-none italic uppercase">GRAPH.AI</h1>
+              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] mt-2 underline decoration-indigo-500/50 underline-offset-4">Ontology Suite</p>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 px-8 space-y-10 overflow-y-auto pb-10">
-          {/* Source Ingestion */}
+        <div className="flex-1 px-8 space-y-12 flex flex-col" style={{ flexGrow: 1 }}>
+          {/* Data Ingestion Module */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                <Globe className="w-3.5 h-3.5" /> Intelligence Source
-              </label>
-              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-red-500'}`}></div>
-            </div>
-            <form onSubmit={handleIngest} className="relative group">
+            <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+              <Globe className="w-3.5 h-3.5" /> Intelligence Source
+            </label>
+            <form onSubmit={handleIngest} className="relative">
               <input
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder={isOnline ? "Enter topic (e.g. OpenAI)..." : "Launch Backend First"}
+                placeholder={isOnline ? "Search Topic..." : "Awaiting Connection"}
                 disabled={!isOnline}
-                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-4 px-5 pr-14 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none text-sm transition-all disabled:opacity-30 placeholder:text-slate-600"
+                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-4 px-5 pr-14 focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all disabled:opacity-30 placeholder:text-slate-600"
               />
               <button 
                 type="submit"
                 disabled={loading || !isOnline}
                 className="absolute right-2 top-2 p-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all active:scale-95 disabled:opacity-40 shadow-xl shadow-indigo-600/20"
               >
-                {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                {loading ? <RefreshCw className="w-5 h-5 animate-spin text-white" /> : <Search className="w-5 h-5 text-white" />}
               </button>
             </form>
           </div>
 
-          {/* Status Monitor */}
+          {/* Infrastructure Monitor */}
           <div className="space-y-4">
             <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-              <Server className="w-3.5 h-3.5" /> Console Stream
+              <Server className="w-3.5 h-3.5" /> Core Monitoring
             </label>
-            <div className="bg-black/40 border border-white/5 p-4 rounded-2xl font-mono text-[11px] leading-relaxed shadow-inner">
-              <div className="flex items-center gap-2 mb-2 text-indigo-400 opacity-60">
-                <Activity className="w-3 h-3" />
-                <span>Live Feed</span>
+            <div className={`p-5 rounded-2xl border flex flex-col gap-3 transition-all duration-500 ${isOnline ? 'bg-indigo-950/20 border-indigo-500/30' : 'bg-red-950/20 border-red-500/30'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-red-500'}`}></div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Network Status</span>
+                </div>
+                <Activity className={`w-4 h-4 ${isOnline ? 'text-indigo-400 opacity-60' : 'text-red-500'}`} />
               </div>
-              <p className={isOnline ? 'text-emerald-400' : 'text-red-400 animate-pulse'}>
+              <p className={`text-xs font-mono font-bold truncate p-2 bg-black/40 rounded-lg border border-white/5 ${isOnline ? 'text-emerald-400' : 'text-red-400 animate-pulse'}`}>
                 {"> "} {status}
               </p>
             </div>
           </div>
 
-          {/* Metrics Grid */}
-          <div className="space-y-4">
-            <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5" /> Discovery Stats
-            </label>
-            <div className="grid grid-cols-2 gap-4">
+          {/* Graph Analytics Module */}
+          <div className="mt-auto space-y-4 pb-8">
+            <div className="flex items-center justify-between px-1">
+               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Analytics Dashboard</span>
+               <Layers className="w-3.5 h-3.5 text-slate-700" />
+            </div>
+            <div className="grid grid-cols-2 gap-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
                <div className="bg-slate-900/40 p-5 rounded-3xl border border-white/5 hover:border-indigo-500/30 transition-colors group">
-                 <p className="text-3xl font-black text-white leading-none group-hover:text-indigo-400 transition-colors">{graphData.nodes.length}</p>
+                 <p className="text-3xl font-black text-white group-hover:text-indigo-400 transition-colors">{graphData.nodes.length}</p>
                  <p className="text-[10px] font-bold text-slate-500 uppercase mt-3 tracking-tighter">Entities</p>
                </div>
                <div className="bg-slate-900/40 p-5 rounded-3xl border border-white/5 hover:border-indigo-500/30 transition-colors group">
-                 <p className="text-3xl font-black text-white leading-none group-hover:text-indigo-400 transition-colors">{graphData.links.length}</p>
-                 <p className="text-[10px] font-bold text-slate-500 uppercase mt-3 tracking-tighter">Relations</p>
+                 <p className="text-3xl font-black text-white group-hover:text-indigo-400 transition-colors">{graphData.links.length}</p>
+                 <p className="text-[10px] font-bold text-slate-500 uppercase mt-3 tracking-tighter">Relationships</p>
                </div>
             </div>
           </div>
         </div>
       </aside>
 
-      {/* Main Viewport Area */}
-      <main className="flex-1 relative bg-[#020617] z-10">
-        {/* Cinematic Grid Backdrop */}
+      {/* MAIN VISUALIZATION VIEWPORT */}
+      <main className="flex-1 relative bg-[#020617]" style={{ flexGrow: 1, position: 'relative' }}>
+        {/* Dynamic Canvas Background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:60px_60px] opacity-10 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
         
-        {/* Status Badge */}
+        {/* Connection Badge */}
         <div className="absolute top-10 left-10 z-20">
           <div className="flex items-center gap-3 bg-slate-900/80 backdrop-blur-2xl px-6 py-3 rounded-3xl border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
              <Database className="w-4 h-4 text-indigo-400" />
              <span className="text-[12px] font-black uppercase tracking-widest text-slate-200">Neo4j AuraDB</span>
              <ChevronRight className="w-4 h-4 text-slate-700" />
-             <span className="text-[10px] font-bold text-indigo-500 uppercase">Live Cluster</span>
+             <span className="text-[10px] font-bold text-indigo-500 uppercase">Live Pipeline</span>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="absolute top-10 right-10 z-20">
-          <button onClick={() => fetchData()} className="p-3 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 transition-all active:scale-90 backdrop-blur-lg">
-            <RefreshCw className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
-          </button>
-        </div>
-
-        {/* The Graph Canvas */}
-        <div className="w-full h-full">
+        {/* Graph Render Surface */}
+        <div className="w-full h-full relative z-10">
           <KnowledgeGraph data={graphData} />
         </div>
 
-        {/* Legend Dashboard */}
-        <div className="absolute bottom-10 right-10 p-8 bg-[#0a0f1d]/80 backdrop-blur-2xl rounded-[2.5rem] border border-white/5 shadow-2xl space-y-5 min-w-[200px]">
+        {/* Global Legend Module */}
+        <div className="absolute bottom-10 right-10 p-8 bg-[#0a0f1d]/80 backdrop-blur-2xl rounded-[2.5rem] border border-white/5 shadow-2xl space-y-5 min-w-[220px] z-20">
           <div className="flex items-center gap-2 text-[11px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-4 mb-2">
-            <Info className="w-4 h-4 text-indigo-500" /> Key Index
+            <Info className="w-4 h-4 text-indigo-500" /> Ontology Index
           </div>
           {[
             { label: 'Location', color: 'bg-emerald-500', shadow: 'shadow-emerald-500/50' },
-            { label: 'Person', color: 'bg-amber-500', shadow: 'shadow-amber-500/50' },
+            { label: 'Key Person', color: 'bg-amber-500', shadow: 'shadow-amber-500/50' },
             { label: 'Organization', color: 'bg-pink-500', shadow: 'shadow-pink-500/50' },
-            { label: 'Concept', color: 'bg-indigo-500', shadow: 'shadow-indigo-500/50' },
+            { label: 'Concept / Event', color: 'bg-indigo-500', shadow: 'shadow-indigo-500/50' },
           ].map((item, idx) => (
             <div key={idx} className="flex items-center gap-4">
               <div className={`w-3 h-3 rounded-full ${item.color} shadow-lg ${item.shadow}`}></div>
