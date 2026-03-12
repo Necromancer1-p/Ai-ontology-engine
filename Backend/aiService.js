@@ -1,16 +1,11 @@
-// aiService.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 
-// Initializing the Gemini API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-/**
- * Extracts entities and relationships from raw text using Gemini 2.5 Flash.
- */
 async function extractOntology(text) {
     try {
-        // Using the exact model name from your discovery list
+        // Bhai, tere system pe ye model kaam kar raha hai (listModels result)
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `
@@ -24,21 +19,16 @@ async function extractOntology(text) {
         }
         Text: ${text}`;
 
-        console.log("AI is processing with gemini-2.5-flash... please wait.");
+        console.log("AI Extraction chalu hai...");
         const result = await model.generateContent(prompt);
         const response = await result.response;
         let jsonString = response.text().trim();
-
-        // Extra cleaning for safety
+        
         jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const parsedData = JSON.parse(jsonString);
-        console.log("✅ AI Extraction Successful! Nodes found:", parsedData.nodes.length);
-        return parsedData;
-
+        return JSON.parse(jsonString);
     } catch (error) {
-        console.error("❌ AI Error:", error.message);
-        return null;
+        console.error("❌ AI Error inside Service:", error.message);
+        throw error; // Throwing so server.js catch can catch the real message
     }
 }
 

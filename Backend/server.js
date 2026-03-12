@@ -1,95 +1,69 @@
-// server.js - Parth bhai ki master integration file
+// server.js - Integrated with AI, DB, and Ingestion Services
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// Apne banaye hue services ko import kar rahe hain
+// Importing services
 const { extractOntology } = require('./aiService');
 const { saveGraphData, getFullGraph } = require('./dbService');
-// Pawan's Data Ingestion Service
-const { fetchAndCleanNews } = require('./ingestionService'); // [cite: 95]
+const { fetchNews } = require('./ingestionService');
 
 const app = express();
-
-// Middleware setup
 app.use(cors());
 app.use(express.json());
 
-// 1. Basic Health Check Route
-app.get('/', (req, res) => {
-    res.send("Backend Master Server ekdum mast chal raha hai bhai! 🚀");
-});
-
-// 2. GET /api/graph - Chetan (Frontend) isko use karega graph dikhane ke liye
+// 1. Graph Data fetch karne ke liye API
 app.get('/api/graph', async (req, res) => {
     try {
-        console.log("[API] Frontend se request aayi hai graph data ke liye...");
-        const graphData = await getFullGraph();
-        res.json(graphData);
+        const data = await getFullGraph();
+        res.json(data);
     } catch (error) {
-        console.error("[FAILED] Graph fetch error:", error);
-        res.status(500).json({ error: "Graph fetch karne mein problem aayi hai bhai." });
+        console.error("Fetch Error:", error);
+        res.status(500).json({ error: "Graph fetch fail ho gaya bhai." });
     }
 });
 
-// 3. POST /api/ingest - Jab user search bar mein topic dalega, tab yeh chalega
+// 2. Real Ingestion API - News + AI + Neo4j
 app.post('/api/ingest', async (req, res) => {
-    const { topic } = req.body; // [cite: 98]
-    
-    if (!topic) {
-        return res.status(400).json({ error: "Topic toh de bhai!" });
-    }
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ error: "Topic toh de bhai!" });
 
     try {
-        console.log(`\n--- [PIPELINE START] Naya Ingestion Start: ${topic} ---`);
+        console.log(`\n--- Processing Topic: ${topic} ---`);
         
-        // STEP 1: PAWAN'S CODE RUNS HERE
-        console.log(`[PIPELINE STEP 1] Calling Pawan's function for: ${topic}`); // [cite: 101]
-        const rawText = await fetchAndCleanNews(topic); // [cite: 103]
+        // Step 1: Pawan's logic - Fetching real news
+        console.log("Fetching news from GNews...");
+        const rawText = await fetchNews(topic);
         
-        if (!rawText) {
-            console.error("[FAILED] Did not get text from Pawan's ingestion service.");
-            throw new Error("Did not get text from NewsAPI"); // [cite: 104]
-        }
-        
-        console.log(`[PIPELINE STEP 1.5] Pawan's function success! Passed clean text of length: ${rawText.length}`);
-        console.log("[PIPELINE STEP 2] Sending clean data to AI..."); // [cite: 106]
-        
-        // STEP 2: PARTH'S AI CODE RUNS HERE
-        const graphJson = await extractOntology(rawText); // [cite: 113]
-        
-        if (!graphJson) {
-            console.error("[FAILED] AI failed to parse the text into a graph.");
-            throw new Error("AI ne dhang se response nahi diya."); // [cite: 114]
+        if (!rawText || rawText.length < 50) {
+            throw new Error("GNews se kuch nahi mila. Pawan ki API key check karo.");
         }
 
-        console.log("[PIPELINE STEP 3] AI extraction successful. Saving to Database...");
-
-        // STEP 3: DATABASE SAVE RUNS HERE
-        const success = await saveGraphData(graphJson); // [cite: 116]
-
-        if (success) {
-            console.log("[PIPELINE SUCCESS] Database mein data save ho gaya! 🏁");
-            res.json({ 
-                message: "Data Ingested and Graph Updated successfully!", // [cite: 117]
-                dataAdded: graphJson 
-            });
+        // Step 2: AI logic - Analyzing text
+        console.log("AI is extracting ontology...");
+        const graphJson = await extractOntology(rawText);
+        
+        if (graphJson) {
+            // Step 3: DB logic - Saving to Neo4j
+            const success = await saveGraphData(graphJson);
+            if (success) {
+                console.log("Graph successfully updated!");
+                res.json({ message: "Knowledge Graph Updated!", data: graphJson });
+            } else {
+                throw new Error("Neo4j database mein save nahi hua.");
+            }
         } else {
-            console.error("[FAILED] Database save function returned false.");
-            res.status(500).json({ error: "Database mein save nahi ho paya." });
+            throw new Error("AI extraction failed.");
         }
-
     } catch (error) {
-        console.error("[PIPELINE FATAL ERROR] Ingestion pipeline failed:", error.message); // [cite: 120]
-        res.status(500).json({ error: "Ingestion pipeline failed, logs check karle." });
+        console.error("❌ INGESTION FAILED:", error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 
-// Server Start
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`\n========================================`);
-    console.log(`🚀 Master Server port ${PORT} pe chalu hai!`);
-    console.log(`Ready for Frontend Connection!`);
+    console.log(`🚀 MASTER SERVER LIVE ON PORT ${PORT}`);
     console.log(`========================================\n`);
 });
