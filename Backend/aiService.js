@@ -42,10 +42,4 @@ async function extractOntology(text) {
     }
 }
 
-// --- TEST RUN (Comment this out later) ---
-const testText = "The US Government is concerned about rising fuel prices in California affecting the logistics sector.";
-extractOntology(testText).then(data => {
-    if (data) console.log("Final JSON Result:", JSON.stringify(data, null, 2));
-});
-
 module.exports = { extractOntology };
