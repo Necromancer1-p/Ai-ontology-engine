@@ -9,7 +9,11 @@ const { saveGraphData, getFullGraph } = require('./dbService');
 const { fetchAndCleanNews } = require('./ingestionService');
 
 const app = express();
-app.use(cors());
+const corsOptions = {
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], // Add deployed URL here later
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // 1. Graph Data fetch karne ke liye API

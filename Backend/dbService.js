@@ -11,28 +11,31 @@ const driver = neo4j.driver(
  * Saves the graph data from AI into Neo4j using MERGE to avoid duplicates.
  */
 async function saveGraphData(graphData) {
-    if (!graphData || !graphData.nodes) return false;
+    if (!graphData || !graphData.nodes || graphData.nodes.length === 0) return false;
     const session = driver.session();
+    
     try {
-        console.log("Database mein data save ho raha hai...");
+        console.log("Saving data to Neo4j in batch mode...");
         
-        // 1. Nodes insert karo
-        for (const node of graphData.nodes) {
-            await session.run(
-                'MERGE (n:Entity {id: $id}) SET n.group = $group',
-                { id: node.id, group: node.group }
-            );
-        }
+        // FIX: 1. Batch insert all nodes using UNWIND
+        await session.run(
+            `UNWIND $nodes AS node
+             MERGE (n:Entity {id: node.id})
+             SET n.group = node.group`,
+            { nodes: graphData.nodes }
+        );
 
-        // 2. Links (Relationships) insert karo
-        for (const link of graphData.links) {
+        // FIX: 2. Batch insert all relationships using UNWIND
+        if (graphData.links && graphData.links.length > 0) {
             await session.run(
-                `MATCH (source:Entity {id: $sourceId})
-                 MATCH (target:Entity {id: $targetId})
-                 MERGE (source)-[r:RELATION {label: $label}]->(target)`,
-                { sourceId: link.source, targetId: link.target, label: link.label }
+                `UNWIND $links AS link
+                 MATCH (source:Entity {id: link.source})
+                 MATCH (target:Entity {id: link.target})
+                 MERGE (source)-[r:RELATION {label: link.label}]->(target)`,
+                { links: graphData.links }
             );
         }
+        
         return true;
     } catch (error) {
         console.error("DB Save Error:", error);
