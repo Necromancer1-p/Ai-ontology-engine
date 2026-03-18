@@ -2,59 +2,101 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 
-// Initializing the Gemini API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Models to try in order (first available wins)
+const MODELS = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+];
+
 /**
- * Extracts entities and relationships from raw text using Gemini 2.5 Flash.
+ * Sleep for ms milliseconds.
+ */
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Extracts entities and relationships from raw text using Gemini.
+ * Retries with exponential backoff on rate-limit (429) errors.
  */
 async function extractOntology(text) {
-    try {
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            generationConfig: {
-                responseMimeType: "application/json",
+    const prompt = buildPrompt(text);
+
+    for (const modelName of MODELS) {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                console.log(`🤖 Trying ${modelName} (attempt ${attempt})...`);
+                const model = genAI.getGenerativeModel({
+                    model: modelName,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        temperature: 0.2,
+                        maxOutputTokens: 2048,
+                    }
+                });
+
+                const result = await model.generateContent(prompt);
+                const raw = result.response.text().trim();
+
+                // Strip accidental markdown fences
+                const clean = raw
+                    .replace(/^```json\s*/i, '')
+                    .replace(/^```\s*/i, '')
+                    .replace(/```\s*$/i, '')
+                    .trim();
+
+                const parsed = JSON.parse(clean);
+                if (!parsed.nodes?.length || !parsed.links) {
+                    throw new Error("Response missing nodes or links");
+                }
+
+                console.log(`✅ Done — ${parsed.nodes.length} nodes, ${parsed.links.length} links`);
+                return parsed;
+
+            } catch (err) {
+                const isRateLimit = err.status === 429 ||
+                    err.message?.includes('429') ||
+                    err.message?.includes('quota') ||
+                    err.message?.includes('RESOURCE_EXHAUSTED');
+
+                if (isRateLimit && attempt < 3) {
+                    const wait = attempt * 20000; // 20s, 40s
+                    console.warn(`⚠️  Rate limit on ${modelName}. Retrying in ${wait/1000}s...`);
+                    await sleep(wait);
+                    continue;
+                }
+
+                if (isRateLimit) {
+                    console.warn(`⚠️  ${modelName} quota exceeded, trying next model...`);
+                    break; // try next model
+                }
+
+                console.error(`❌ ${modelName} error:`, err.message);
+                break; // non-rate-limit error, try next model
             }
-        });
-
-        // FIX: Upgraded prompt for Entity Resolution and Graph Limiting
-        const prompt = `
-        You are an expert AI ontology extractor building a geopolitical intelligence graph.
-        Analyze the following text and extract the MOST CRITICAL entities and relationships.
-        Entities must be categorized strictly as: Location, Organization, Person, Concept.
-        
-        CRITICAL RULES:
-        1. MERGE SYNONYMS: Standardize names. Use "United States" instead of "US" or "USA". Use full official names for people and organizations.
-        2. LIMIT OUTPUT: Extract a maximum of 20 high-value nodes and 25 critical relationships. Do not overwhelm the graph.
-        3. CLEAN LABELS: Keep relationship labels short, uppercase, and with underscores (e.g., ALLIED_WITH, FUNDS, SANCTIONED).
-        
-        Return ONLY a valid JSON object in this format:
-        {
-          "nodes": [{"id": "Standardized Name", "group": "Category"}],
-          "links": [{"source": "Standardized Name A", "target": "Standardized Name B", "label": "RELATION"}]
         }
-        Text: ${text}`;
-
-        console.log("AI is processing with gemini-2.5-flash... please wait.");
-        const result = await model.generateContent(prompt);
-        
-        let jsonString = result.response.text().trim();
-        // Strip markdown backticks just in case
-        jsonString = jsonString.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-
-        try {
-            const parsedData = JSON.parse(jsonString);
-            console.log("✅ AI Extraction Successful! Nodes found:", parsedData.nodes?.length);
-            return parsedData;
-        } catch (parseError) {
-            console.error("❌ JSON Parsing Error:", parseError.message);
-            return null;
-        }
-
-    } catch (error) {
-        console.error("❌ AI Error:", error.message);
-        return null;
     }
+
+    console.error("❌ All models exhausted or failed.");
+    return null;
+}
+
+function buildPrompt(text) {
+    return `You are an AI ontology extractor. Extract entities and relationships from the text below.
+Entity types: Person, Organization, Location, Country, Technology, Concept.
+Return ONLY valid JSON, no markdown, no explanation:
+{
+  "nodes": [{"id": "EntityName", "group": "Type", "importance": 7}],
+  "links": [{"source": "A", "target": "B", "label": "RELATION", "strength": 7}]
+}
+- importance and strength: integers 1-10
+- label: UPPER_SNAKE_CASE
+- Extract at least 5 nodes and 4 links
+
+Text: ${text.slice(0, 5000)}`;
 }
 
 module.exports = { extractOntology };
