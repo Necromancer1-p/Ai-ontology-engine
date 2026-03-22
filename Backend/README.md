@@ -3,10 +3,11 @@
 This is the backend for the Global Ontology Engine. It's built with **FastAPI** to expose APIs that process raw intelligence text using a **Google Gemini Large Language Model** via the `google-genai` library, which extracts dynamic entity (node) and relationship (edge) data into a structured format. This data is then merged into a **Neo4j** graph database using Cypher queries. It also features an AI Analyst Brief endpoint that generates situation reports based on the extracted situational context.
 
 ## Capabilities
-- Extract knowledge graphs from raw text.
-- Insert structured knowledge into a Neo4j database using a singleton driver.
-- Automatically generate 2-3 paragraph analyst briefs (with key risks) using extracted graphs via Gemini APIs.
-- Includes a standalone batch ingestion script (`ingest.py`) with rate limit controls to process multiple articles at once.
+- Extract knowledge graphs from raw text via the Google Gemini LLM API.
+- Validate generated data via Pydantic structured schemas.
+- Insert structured knowledge securely into a Neo4j database using a singleton driver instance and sanitized Cypher queries.
+- Generate multi-paragraph, AI-authored analyst briefs (including key risks) using extracted graphs.
+- Includes a standalone batch ingestion script (`ingest.py`) with automatic rate limit controls to process multiple articles simultaneously.
 
 ## Setup & Run Instructions
 
@@ -62,4 +63,6 @@ This script reads `sample_data.json` and runs extraction models on each article,
 
 ---
 ## Note about the Frontend
-The companion Next.js React frontend (located in `../Frontend/ai-onto-globe`) provides a modern interface that displays real-time entity extraction maps dynamically using D3-force graph representations. You can tweak graph physics (like node repulsion and link distances) via custom UI sliders to arrange the map beautifully. Please see the [Frontend README](../Frontend/README.md) for its specific setup and run instructions.
+The companion Next.js React frontend (located in `../Frontend/ai-onto-globe`) provides a modern dashboard interface that dynamically displays these real-time entity extraction graphs. The frontend renders this structured data using an interactive D3-force layout, allowing users to customize physics components like node repulsion and link distances via real-time sliders.
+
+You can refer to the [Frontend README](../Frontend/README.md) for its specific capabilities and setup/run instructions.

@@ -3,47 +3,51 @@
 ## Main Goal
 The main goal of this project is to create an AI-powered "Global Ontology Engine" that acts as a real-time entity extraction and intelligence mapping tool. It takes raw text inputs (like news articles or intelligence briefs), uses a Large Language Model (Google Gemini via `google-genai`) to extract a dynamic knowledge graph (entities/nodes and their relationships/edges), and stores this graph in a Neo4j graph database. The frontend provides a Next.js-based interactive visualization of this knowledge graph using `react-force-graph-2d` and allows users to request an AI-generated analyst brief based on the extracted situational context.
 
-## Complete Project Structure (Except `node_modules`)
+## Complete Project Structure (Except `node_modules` and `.git` and `.next`)
 
 ```
 / (Root Folder)
-├── .git/
+├── prompt.md
+├── README.md
+├── requirements.txt
 ├── Backend/
+│   ├── .env (if configured)
 │   ├── .gitignore
+│   ├── README.md
 │   ├── database.py
 │   ├── ingest.py
 │   ├── llm.py
 │   ├── main.py
 │   └── sample_data.json
-├── Frontend/
-│   └── ai-onto-globe/
-│       ├── .gitignore
-│       ├── AGENTS.md
-│       ├── CLAUDE.md
-│       ├── README.md
-│       ├── app/
-│       │   ├── favicon.ico
-│       │   ├── globals.css
-│       │   ├── layout.js
-│       │   └── page.js
-│       ├── components/
-│       │   ├── CustomSlider.js
-│       │   └── KnowledgeGraph.js
-│       ├── lib/
-│       │   └── api.js
-│       ├── public/
-│       │   ├── file.svg
-│       │   ├── globe.svg
-│       │   ├── next.svg
-│       │   ├── vercel.svg
-│       │   └── window.svg
-│       ├── eslint.config.mjs
-│       ├── jsconfig.json
-│       ├── next.config.mjs
-│       ├── package-lock.json
-│       ├── package.json
-│       └── postcss.config.mjs
-└── requirements.txt
+└── Frontend/
+    ├── README.md
+    └── ai-onto-globe/
+        ├── .gitignore
+        ├── AGENTS.md
+        ├── CLAUDE.md
+        ├── README.md
+        ├── eslint.config.mjs
+        ├── jsconfig.json
+        ├── next.config.mjs
+        ├── package-lock.json
+        ├── package.json
+        ├── postcss.config.mjs
+        ├── app/
+        │   ├── favicon.ico
+        │   ├── globals.css
+        │   ├── layout.js
+        │   └── page.js
+        ├── components/
+        │   ├── CustomSlider.js
+        │   └── KnowledgeGraph.js
+        ├── lib/
+        │   └── api.js
+        └── public/
+            ├── file.svg
+            ├── globe.svg
+            ├── next.svg
+            ├── vercel.svg
+            └── window.svg
 ```
 
 ## What is Done and Capabilities
@@ -60,17 +64,24 @@ The main goal of this project is to create an AI-powered "Global Ontology Engine
 ## Directory and File Details
 
 ### `/ (Root Folder)`
-The main workspace containing both backend and frontend codebases, and top-level dependencies.
-- `requirements.txt`: Contains the Python dependencies required for the backend (`fastapi`, `uvicorn`, `neo4j`, `google-generativeai` (Note: the code uses `google-genai`), `pydantic`, `python-dotenv`).
+The main workspace containing both backend and frontend codebases, top-level documentation, and dependencies.
+- `prompt.md`: This file, detailing the project overview, structure, capabilities, and file descriptions, with the original prompt appended at the end.
+- `README.md`: The root documentation file outlining the entire project and linking to frontend and backend specific READMEs.
+- `requirements.txt`: Contains the Python dependencies required for the backend (`fastapi`, `uvicorn`, `neo4j`, `google-genai`, `pydantic`, `python-dotenv`).
 
 ### `/Backend/`
 Contains the Python FastAPI backend application that handles data extraction, database interaction, and AI brief generation.
 - `.gitignore`: Specifies intentionally untracked files to ignore for Git.
+- `README.md`: Backend specific documentation and setup/run instructions.
 - `database.py`: Handles the Neo4j database connection using the official neo4j driver. Provides a global database driver and includes the `insert_graph_data` function to merge nodes and relationships using Cypher queries.
 - `ingest.py`: A standalone utility script to load JSON data from `sample_data.json` and bulk ingest it through the LLM extraction pipeline and into the Neo4j database, complete with rate-limiting pauses.
 - `llm.py`: Manages the Google Gemini API integration using the `google-genai` library. Defines Pydantic schemas (`Node`, `Edge`, `KnowledgeGraphSchema`) to enforce structured JSON output. Contains `extract_graph_from_text` to parse text into a graph and `generate_analyst_brief` for situation reports.
 - `main.py`: The entry point for the FastAPI application. Sets up CORS middleware, global logging, and defines the RESTful endpoints (`/api/extract` and `/api/insights`) that wire together the LLM and DB logic.
-- `sample_data.json`: A sample dataset (likely JSON list of texts) used by `ingest.py` for testing bulk ingestions.
+- `sample_data.json`: A sample dataset (JSON array of text objects) used by `ingest.py` for testing bulk ingestions.
+
+### `/Frontend/`
+Contains the frontend project.
+- `README.md`: Documentation holding information about the frontend and how to set it up and run it.
 
 ### `/Frontend/ai-onto-globe/`
 Contains the Next.js React frontend application.
@@ -103,7 +114,8 @@ Static assets served directly by Next.js.
 - `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg`: Various SVG icons and logos used within the project (standard Next.js boilerplate).
 
 ---
-create prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then define each file in detail about what it does and define each folder about what it does and in the end of the file copy this prompt
+
+update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then define each file in detail about what it does and define each folder about what it does and in the end of the file copy this prompt
 
 and create readme.md files, one for backend folder, one for frontend folder, one for root folder
 readme in root folder hold the overview of the whole project
