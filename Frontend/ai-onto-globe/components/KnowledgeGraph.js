@@ -8,8 +8,6 @@ const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false 
 const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
   const containerRef = useRef(null);
   const fgRef = useRef(); 
-  
-  // States for dimensions and our new Hover effect
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoverNode, setHoverNode] = useState(null);
 
@@ -93,6 +91,19 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
   }, [data]);
 
   // --- REAL-TIME PHYSICS UPDATES ---
+  // --- THE SAFETY FILTER ---
+  // 1. Create a fast-lookup Set of all the valid Node IDs the AI actually gave us
+  const validNodeIds = new Set(data?.nodes?.map(n => n.id) || []);
+
+  const graphData = {
+    nodes: data?.nodes?.map(node => ({ ...node, color: getNodeColor(node.label) })) || [],
+    
+    // 2. Filter out any "orphan" edges where the source or target node doesn't exist!
+    links: data?.edges?
+      .filter(edge => validNodeIds.has(edge.source) && validNodeIds.has(edge.target))
+      .map(edge => ({ ...edge, name: edge.type })) || [] 
+  };
+
   useEffect(() => {
     if (fgRef.current) {
       fgRef.current.d3Force('charge').strength(-repulsion);

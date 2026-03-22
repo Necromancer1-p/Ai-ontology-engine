@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
@@ -61,6 +62,15 @@ db_conn = Neo4jConnection(NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)
 def get_db():
     return db_conn.get_driver()
 
+# Helper function to sanitize AI-generated labels and edge types
+def sanitize_cypher_string(text: str) -> str:
+    """Replaces spaces and invalid characters with underscores to prevent Cypher syntax errors."""
+    if not text:
+        return "UNKNOWN"
+    # Replace anything that is not a letter, number, or underscore with an underscore
+    clean_text = re.sub(r'[^a-zA-Z0-9_]', '_', str(text).strip())
+    return clean_text
+
 # 5. Graph Insertion Function
 def insert_graph_data(driver, graph_data: dict) -> bool:
     """Takes the JSON from the LLM and inserts it into Neo4j using Cypher queries."""
@@ -78,25 +88,33 @@ def insert_graph_data(driver, graph_data: dict) -> bool:
         try:
             # Step A: Insert Nodes
             for node in nodes:
-                logger.info(f"Merging node: [{node['label']}] {node['id']}")
-                # Cypher requires labels to be hardcoded strings, so we format the label securely
-                # but pass the data (id, name) as parameters to prevent injection.
+                # Sanitize the label before using it in the query
+                raw_label = node.get('label', 'Entity')
+                safe_label = sanitize_cypher_string(raw_label)
+                
+                logger.info(f"Merging node: [{safe_label}] (Original AI Label: '{raw_label}') ID: {node['id']}")
+                
+                # We use backticks around the label just as an extra layer of absolute security
                 query = f"""
-                MERGE (n:{node['label']} {{id: $id}})
+                MERGE (n:`{safe_label}` {{id: $id}})
                 SET n.name = $name
                 """
                 session.run(query, id=node["id"], name=node["name"])
             
-            logger.info("SUCCESS: All nodes processed.")
+            logger.info("SUCCESS: All nodes safely inserted.")
 
             # Step B: Insert Edges (Relationships)
             for edge in edges:
-                logger.info(f"Merging edge: {edge['source']} -[{edge['type']}]-> {edge['target']}")
-                # We MATCH the two nodes by their IDs, then MERGE the relationship between them
+                # Sanitize the edge type before using it in the query
+                raw_type = edge.get('type', 'RELATED_TO')
+                safe_type = sanitize_cypher_string(raw_type).upper() # Edge types are conventionally uppercase
+                
+                logger.info(f"Merging edge: {edge['source']} -[{safe_type}]-> {edge['target']} (Original AI Type: '{raw_type}')")
+                
                 query = f"""
                 MATCH (source {{id: $source}})
                 MATCH (target {{id: $target}})
-                MERGE (source)-[r:{edge['type']}]->(target)
+                MERGE (source)-[r:`{safe_type}`]->(target)
                 """
                 session.run(query, source=edge["source"], target=edge["target"])
                 

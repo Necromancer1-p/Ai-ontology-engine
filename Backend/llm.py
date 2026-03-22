@@ -61,13 +61,32 @@ def extract_graph_from_text(text: str) -> dict:
         logger.error("FAILURE: GenAI client is not initialized.")
         return {"nodes": [], "edges": []}
 
-    prompt = f"""
-    You are an elite intelligence analyst. Read the following text and extract the key entities and their relationships to build a dynamic intelligence graph.
-    Create specific, context-aware categories for entities (Node labels) and precise relationship descriptions (Edge types).
-    
-    Text to analyze:
-    {text}
-    """
+    # --- THE ROUTER LOGIC ---
+    # We count the words to determine the user's intent.
+    word_count = len(text.split())
+    logger.info(f"Input text word count analyzed: {word_count} words.")
+
+    if word_count < 25:
+        logger.info("ROUTER: Short input detected. Engaging TOPIC EXPANSION MODE.")
+        prompt = f"""
+        You are an elite intelligence analyst. The user has provided a short topic or search query. 
+        Do NOT just extract the literal words. Instead, use your vast internal knowledge to EXPAND on this topic.
+        Build a comprehensive, highly detailed intelligence graph (aiming for 10-15 nodes) that maps out the key organizations, people, locations, events, and technologies related to this topic.
+        Create specific, context-aware categories for entities (Node labels) and precise relationship descriptions (Edge types).
+        
+        Topic to expand:
+        {text}
+        """
+    else:
+        logger.info("ROUTER: Long input detected. Engaging standard INFORMATION EXTRACTION MODE.")
+        prompt = f"""
+        You are an elite intelligence analyst. Read the following text and extract the key entities and their relationships to build a dynamic intelligence graph.
+        Create specific, context-aware categories for entities (Node labels) and precise relationship descriptions (Edge types).
+        Strictly rely on the provided text for your extraction.
+        
+        Text to analyze:
+        {text}
+        """
     
     for model_name in AVAILABLE_MODELS:
         try:
@@ -80,7 +99,7 @@ def extract_graph_from_text(text: str) -> dict:
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=KnowledgeGraphSchema,
-                    temperature=0.1 # Low temperature for factual extraction
+                    temperature=0.2 # Slightly higher temp to allow for creative topic expansion
                 )
             )
             
