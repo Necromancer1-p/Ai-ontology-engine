@@ -314,8 +314,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* TASK 2: Evidence Panel */}
-          <EvidencePanel articles={articles} selectedNode={selectedNode} />
+          {/* TASK 2: Evidence Panel - FIXED TO PASS GRAPHDATA */}
+          <EvidencePanel 
+            articles={articles} 
+            selectedNode={selectedNode} 
+            graphData={filteredGraphData} 
+          />
 
           {/* Graph Physics Controls */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">

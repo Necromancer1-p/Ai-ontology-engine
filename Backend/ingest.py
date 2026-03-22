@@ -19,13 +19,16 @@ def run_ingestion():
     logger.info("Starting Global Ontology Engine Ingestion Pipeline...")
     
     # 2. Verify Database Connection
+    logger.info("Verifying Neo4j database connection...")
     db_driver = get_db()
     if not db_driver:
         logger.error("CRITICAL FAILURE: Cannot connect to the database. Aborting ingestion.")
         return
+    logger.info("Database connection verified successfully.")
 
     # 3. Load Sample Data
     data_file_path = "sample_data.json"
+    logger.info(f"Checking for data file at {data_file_path}...")
     if not os.path.exists(data_file_path):
         logger.error(f"CRITICAL FAILURE: Could not find {data_file_path}")
         return
@@ -40,12 +43,19 @@ def run_ingestion():
     total_successful = 0
     
     for index, article in enumerate(articles):
+        logger.info(f"--- Initiating processing for Article {index + 1} ---")
+        
+        # Extract title and text with logs
+        article_title = article.get("title", "Unknown Title")
+        logger.info(f"Extracted title: {article_title}")
+        
         text = article.get("text", "")
         if not text:
-            logger.warning(f"Skipping article at index {index} because it has no text.")
+            logger.warning(f"Skipping article '{article_title}' because it has no text.")
             continue
             
-        logger.info(f"--- Processing Article {index + 1} of {len(articles)} ---")
+        # Log check matching the task list requirement
+        logger.info(f"Ingesting article {index + 1}/{len(articles)}: {article_title}")
         
         # Step A: Extract
         logger.info("Extracting entities and relationships via LLM...")
@@ -53,7 +63,7 @@ def run_ingestion():
         
         # Check if the LLM returned valid data
         if not graph_data.get("nodes") and not graph_data.get("edges"):
-            logger.warning(f"Failed to extract any graph data from Article {index + 1}. Skipping database insertion.")
+            logger.warning(f"Failed to extract any graph data from '{article_title}'. Skipping database insertion.")
             continue
             
         # Step B: Insert into Database
@@ -61,13 +71,12 @@ def run_ingestion():
         success = insert_graph_data(db_driver, graph_data)
         
         if success:
-            logger.info(f"SUCCESS: Article {index + 1} fully ingested into the Intelligence Graph.")
+            logger.info(f"SUCCESS: '{article_title}' fully ingested into the Intelligence Graph.")
             total_successful += 1
         else:
-            logger.error(f"FAILURE: Could not insert data for Article {index + 1}.")
+            logger.error(f"FAILURE: Could not insert data for '{article_title}'.")
             
         # Step C: Rate Limit Protection
-        # If this isn't the last article, pause for 15 seconds to respect free-tier API limits
         if index < len(articles) - 1:
             logger.info("Pausing for 15 seconds to respect Gemini API rate limits... DO NOT KILL THE SCRIPT.")
             time.sleep(15)

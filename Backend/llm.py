@@ -43,11 +43,15 @@ class Node(BaseModel):
     id: str = Field(description="Unique ID, uppercase with underscores, e.g., ETHEREUM, VITALIK_BUTERIN, USA")
     label: str = Field(description="Determine the most accurate category for the entity (e.g., Technology, Cryptocurrency, Company, Person, Market, Country, Event).")
     name: str = Field(description="Clean, human-readable name")
+    source_url: str = Field(default="", description="Provenance tracking: Source URL")
+    source_title: str = Field(default="", description="Provenance tracking: Source Title")
 
 class Edge(BaseModel):
     source: str = Field(description="The ID of the source node")
     target: str = Field(description="The ID of the target node")
     type: str = Field(description="Generate a highly specific relationship type in UPPERCASE_WITH_UNDERSCORES (e.g., PARTNERED_WITH, INTEGRATES_WITH, FOUNDED_BY, THREATENS).")
+    source_url: str = Field(default="", description="Provenance tracking: Source URL")
+    source_title: str = Field(default="", description="Provenance tracking: Source Title")
 
 class KnowledgeGraphSchema(BaseModel):
     nodes: list[Node]
@@ -106,12 +110,19 @@ def extract_graph_from_text(text: str, source_url: str = "", source_title: str =
             logger.info(f"SUCCESS: Received valid JSON response from {model_name}.")
             result = json.loads(response.text)
             
-            # Stamp provenance metadata onto every node for the Evidence Panel
+            # Stamp provenance metadata onto every node AND edge for the Evidence Panel
             if source_url or source_title:
                 for node in result.get("nodes", []):
                     node["source_url"] = source_url
                     node["source_title"] = source_title
                 logger.info(f"Provenance stamped on {len(result.get('nodes', []))} nodes. Source: '{source_title}'")
+                
+                for edge in result.get("edges", []):
+                    edge["source_url"] = source_url
+                    edge["source_title"] = source_title
+                    # Log check requirement for Edge Provenance
+                    logger.info(f"Attached source URL to edge: ({edge.get('source')}) -> ({edge.get('target')})")
+                logger.info(f"Provenance stamped on {len(result.get('edges', []))} edges.")
             
             logger.info(f"Extracted {len(result.get('nodes', []))} nodes and {len(result.get('edges', []))} edges.")
             return result

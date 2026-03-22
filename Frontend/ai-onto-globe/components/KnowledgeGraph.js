@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 // This is the magic trick to stop Next.js from crashing during SSR!
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
-const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40, onNodeClick }) => {
+const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 60, onNodeClick }) => {
   const containerRef = useRef(null);
   const fgRef = useRef(); 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -94,7 +94,7 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40, onNodeClick }
 
   useEffect(() => {
     if (fgRef.current) {
-      fgRef.current.d3Force('charge').strength(-repulsion);
+      fgRef.current.d3Force('charge').strength(-repulsion * 2); // Increased repulsion slightly for readability
       fgRef.current.d3Force('link').distance(linkDistance);
       fgRef.current.d3ReheatSimulation();
     }
@@ -113,6 +113,38 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40, onNodeClick }
           linkColor={() => 'rgba(255,255,255,0.2)'}
           linkDirectionalArrowLength={3.5}
           linkDirectionalArrowRelPos={1}
+          
+          // --- EDGE TEXT RENDERING ---
+          linkCanvasObjectMode={() => 'after'}
+          linkCanvasObject={(link, ctx, globalScale) => {
+            const label = link.name;
+            if (!label || !link.source || !link.target || typeof link.source !== 'object' || typeof link.target !== 'object') return;
+
+            const start = link.source;
+            const end = link.target;
+
+            // Calculate middle point
+            const textPos = Object.assign(...['x', 'y'].map(c => ({
+              [c]: start[c] + (end[c] - start[c]) / 2 
+            })));
+
+            const relLink = { x: end.x - start.x, y: end.y - start.y };
+            let textAngle = Math.atan2(relLink.y, relLink.x);
+            // Maintain label upright
+            if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
+            if (textAngle < -Math.PI / 2) textAngle = -(-Math.PI - textAngle);
+
+            const fontSize = 3.5;
+            ctx.font = `${fontSize}px Sans-Serif`;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.save();
+            ctx.translate(textPos.x, textPos.y);
+            ctx.rotate(textAngle);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, 0, -2); // Offset slightly above the line
+            ctx.restore();
+          }}
           
           // TASK 4: HOVER STATE TRACKING
           onNodeHover={(node) => {
