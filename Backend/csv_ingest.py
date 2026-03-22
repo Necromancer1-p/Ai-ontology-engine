@@ -10,7 +10,7 @@ Each row creates nodes for:
   - Chain (blockchain network)
 
 And relationships:
-  - (Protocol)-[:HACKED_FOR {amount_usd, date}]->(Attacker)  
+  - (Protocol)-[:HACKED_BY {amount_usd, date}]->(Attacker)  
   - (Attacker)-[:USED_CHAIN]->(Chain)
   - (Protocol)-[:DEPLOYED_ON]->(Chain)
 
@@ -64,6 +64,8 @@ def run_csv_ingestion():
     logger.info(f"Loaded {len(rows)} records from CSV.")
 
     success_count = 0
+    source_url = "https://github.com/Ai-ontology-engine/crypto_hacks.csv"
+    source_title = "Crypto Hacks Dataset (CSV)"
 
     with driver.session() as session:
         for index, row in enumerate(rows):
@@ -82,71 +84,96 @@ def run_csv_ingestion():
                 logger.info(f"[{index + 1}/{len(rows)}] Merging: {target} --[HACKED_FOR ${amount:,}]--> {attacker} on {chain}")
 
                 # Merge Protocol node
+                logger.info(f"Creating/Updating Protocol node: {target}")
                 session.run("""
                     MERGE (p:Protocol {id: $id})
                     SET p.name = $name,
-                        p.source_title = 'Crypto Hacks Dataset (CSV)',
-                        p.source_url = 'https://github.com/Ai-ontology-engine'
+                        p.source_title = $source_title,
+                        p.source_url = $source_url
                     """,
-                    id=target_id, name=target
+                    id=target_id, name=target, source_title=source_title, source_url=source_url
                 )
 
-                # Merge Attacker node (if known)
+                # Merge Attacker node & Relationships (if known)
                 if attacker and attacker != "Unknown":
+                    logger.info(f"Creating/Updating ThreatActor node: {attacker}")
                     session.run("""
                         MERGE (a:ThreatActor {id: $id})
                         SET a.name = $name,
-                            a.source_title = 'Crypto Hacks Dataset (CSV)'
+                            a.source_title = $source_title,
+                            a.source_url = $source_url
                         """,
-                        id=attacker_id, name=attacker
+                        id=attacker_id, name=attacker, source_title=source_title, source_url=source_url
                     )
-                    # Merge the HACKED relationship with financial metadata
+                    
+                    # Merge the HACKED_BY relationship with financial AND provenance metadata
+                    logger.info(f"Linking {target} to attacker {attacker}...")
                     session.run("""
                         MATCH (p:Protocol {id: $target_id})
                         MATCH (a:ThreatActor {id: $attacker_id})
                         MERGE (p)-[r:HACKED_BY]->(a)
                         SET r.amount_usd = $amount,
                             r.date = $date,
-                            r.attack_type = $attack_type
+                            r.attack_type = $attack_type,
+                            r.source_url = $source_url,
+                            r.source_title = $source_title
                         """,
                         target_id=target_id,
                         attacker_id=attacker_id,
                         amount=amount,
                         date=date,
-                        attack_type=attack_type
+                        attack_type=attack_type,
+                        source_url=source_url,
+                        source_title=source_title
                     )
+                    logger.info(f"Attached source URL to edge: {target} -> {attacker}")
 
                 # Merge Chain node
+                logger.info(f"Creating/Updating Blockchain node: {chain}")
                 session.run("""
                     MERGE (c:Blockchain {id: $id})
-                    SET c.name = $name
+                    SET c.name = $name,
+                        c.source_url = $source_url,
+                        c.source_title = $source_title
                     """,
-                    id=chain_id, name=chain
+                    id=chain_id, name=chain, source_url=source_url, source_title=source_title
                 )
 
-                # Merge DEPLOYED_ON relationship
+                # Merge DEPLOYED_ON relationship with provenance
+                logger.info(f"Linking protocol {target} to chain {chain}...")
                 session.run("""
                     MATCH (p:Protocol {id: $target_id})
                     MATCH (c:Blockchain {id: $chain_id})
-                    MERGE (p)-[:DEPLOYED_ON]->(c)
+                    MERGE (p)-[r:DEPLOYED_ON]->(c)
+                    SET r.source_url = $source_url,
+                        r.source_title = $source_title
                     """,
                     target_id=target_id,
-                    chain_id=chain_id
+                    chain_id=chain_id,
+                    source_url=source_url,
+                    source_title=source_title
                 )
+                logger.info(f"Attached source URL to edge: {target} -> {chain}")
 
-                # If attacker is known, also link them to the chain
+                # If attacker is known, link them to the chain with provenance
                 if attacker and attacker != "Unknown":
+                    logger.info(f"Linking attacker {attacker} to chain {chain}...")
                     session.run("""
                         MATCH (a:ThreatActor {id: $attacker_id})
                         MATCH (c:Blockchain {id: $chain_id})
-                        MERGE (a)-[:USED_CHAIN]->(c)
+                        MERGE (a)-[r:USED_CHAIN]->(c)
+                        SET r.source_url = $source_url,
+                            r.source_title = $source_title
                         """,
                         attacker_id=attacker_id,
-                        chain_id=chain_id
+                        chain_id=chain_id,
+                        source_url=source_url,
+                        source_title=source_title
                     )
+                    logger.info(f"Attached source URL to edge: {attacker} -> {chain}")
 
                 success_count += 1
-                logger.info(f"SUCCESS: Row {index + 1} merged.")
+                logger.info(f"SUCCESS: Row {index + 1} fully merged with provenance tracking.")
 
             except Exception as e:
                 logger.error(f"FAILURE on row {index + 1} ({row.get('Target', '?')}): {e}")

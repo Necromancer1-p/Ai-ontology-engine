@@ -45,11 +45,15 @@ export const getInsights = async (topic, context) => {
     }
 };
 
-// 4. Function to search the Neo4j graph by entity name (Task 3)
+// 4. Function to search the Neo4j graph by entity name (Task 3 - UPDATED TO GET)
 export const searchGraph = async (query) => {
-    console.log(`[API Call] Sending search query to backend: "${query}"`);
+    console.log(`[API Call] Formatting GET request for search query: "${query}"`);
     try {
-        const response = await apiClient.post('/api/search', { query });
+        // We use params here so Axios automatically builds the URL: /api/search?query=...
+        const response = await apiClient.get('/api/search', { 
+            params: { query: query } 
+        });
+        
         const nodeCount = response.data?.data?.nodes?.length || 0;
         console.log(`[API Call] Search SUCCESS: Found ${nodeCount} nodes for "${query}".`);
         return response.data;

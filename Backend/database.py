@@ -8,7 +8,6 @@ from neo4j.exceptions import ServiceUnavailable, AuthError
 # 1. Setup Logging for the Database
 logger = logging.getLogger("ontology_backend.database")
 logger.setLevel(logging.INFO)
-# If the logger doesn't have handlers, add one
 if not logger.handlers:
     ch = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -33,47 +32,34 @@ class Neo4jConnection:
         
         logger.info(f"Attempting to connect to Neo4j at URI: {self.__uri}")
         try:
-            # Create the driver
             self.__driver = GraphDatabase.driver(self.__uri, auth=(self.__user, self.__pwd))
-            # Verify connectivity immediately to catch errors early
             self.__driver.verify_connectivity()
             logger.info("SUCCESS: Connected to Neo4j AuraDB!")
-        except AuthError:
-            logger.error("FAILURE: Authentication failed. Please check your NEO4J_USERNAME and NEO4J_PASSWORD.")
-        except ServiceUnavailable:
-            logger.error("FAILURE: Database service is unavailable. Check your NEO4J_URI or ensure your AuraDB instance is running.")
         except Exception as e:
-            logger.error(f"FAILURE: An unexpected error occurred while connecting to Neo4j: {e}")
+            logger.error(f"FAILURE connecting to Neo4j: {e}")
 
     def close(self):
         if self.__driver is not None:
-            logger.info("Closing Neo4j connection...")
             self.__driver.close()
             logger.info("Neo4j connection closed safely.")
 
     def get_driver(self):
         return self.__driver
 
-# 4. Initialize a global connection instance
+# 4. Initialize global connection
 logger.info("Initializing Neo4j global connection object...")
 db_conn = Neo4jConnection(NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)
 
-# Helper function to get the driver in other files
 def get_db():
     return db_conn.get_driver()
 
-# Helper function to sanitize AI-generated labels and edge types
 def sanitize_cypher_string(text: str) -> str:
-    """Replaces spaces and invalid characters with underscores to prevent Cypher syntax errors."""
     if not text:
         return "UNKNOWN"
-    # Replace anything that is not a letter, number, or underscore with an underscore
-    clean_text = re.sub(r'[^a-zA-Z0-9_]', '_', str(text).strip())
-    return clean_text
+    return re.sub(r'[^a-zA-Z0-9_]', '_', str(text).strip())
 
 # 5. Graph Insertion Function
 def insert_graph_data(driver, graph_data: dict) -> bool:
-    """Takes the JSON from the LLM and inserts it into Neo4j using Cypher queries."""
     if not driver:
         logger.error("FAILURE: Cannot insert data, Neo4j driver is not initialized.")
         return False
@@ -81,115 +67,101 @@ def insert_graph_data(driver, graph_data: dict) -> bool:
     nodes = graph_data.get("nodes", [])
     edges = graph_data.get("edges", [])
     
-    logger.info(f"Starting database insertion for {len(nodes)} nodes and {len(edges)} edges...")
-    
-    # We use a session to execute our queries
     with driver.session() as session:
         try:
-            # Step A: Insert Nodes
             for node in nodes:
-                # Sanitize the label before using it in the query
                 raw_label = node.get('label', 'Entity')
                 safe_label = sanitize_cypher_string(raw_label)
-                
-                logger.info(f"Merging node: [{safe_label}] (Original AI Label: '{raw_label}') ID: {node['id']}")
-                
-                # Extract optional provenance fields
                 source_url = node.get("source_url", "")
                 source_title = node.get("source_title", "")
                 
-                # We use backticks around the label just as an extra layer of absolute security
                 query = f"""
                 MERGE (n:`{safe_label}` {{id: $id}})
-                SET n.name = $name,
-                    n.source_url = $source_url,
-                    n.source_title = $source_title
+                SET n.name = $name, n.source_url = $source_url, n.source_title = $source_title
                 """
                 session.run(query, id=node["id"], name=node["name"], source_url=source_url, source_title=source_title)
-            
-            logger.info("SUCCESS: All nodes safely inserted.")
 
-            # Step B: Insert Edges (Relationships)
             for edge in edges:
-                # Sanitize the edge type before using it in the query
                 raw_type = edge.get('type', 'RELATED_TO')
-                safe_type = sanitize_cypher_string(raw_type).upper() # Edge types are conventionally uppercase
-                
-                logger.info(f"Merging edge: {edge['source']} -[{safe_type}]-> {edge['target']} (Original AI Type: '{raw_type}')")
+                safe_type = sanitize_cypher_string(raw_type).upper()
+                source_url = edge.get("source_url", "")
+                source_title = edge.get("source_title", "")
                 
                 query = f"""
                 MATCH (source {{id: $source}})
                 MATCH (target {{id: $target}})
                 MERGE (source)-[r:`{safe_type}`]->(target)
+                SET r.source_url = $source_url, r.source_title = $source_title
                 """
-                session.run(query, source=edge["source"], target=edge["target"])
+                session.run(query, source=edge["source"], target=edge["target"], source_url=source_url, source_title=source_title)
+                logger.info(f"Attached source URL to edge: {edge['source']} -> {edge['target']}")
                 
-            logger.info("SUCCESS: All edges processed and graph data committed to Neo4j.")
             return True
-            
         except Exception as e:
             logger.error(f"FAILURE during database insertion: {e}")
             return False
 
-# 6. Search Graph Function
+# 6. Search Graph Function (FIXED FOR 1-HOP NEIGHBORHOOD)
 def search_graph(driver, query: str) -> dict:
-    """
-    Search Neo4j for nodes whose name contains 'query' (case-insensitive).
-    Returns a graph dict {nodes, edges} of matching nodes + their connected edges.
-    """
     if not driver:
         logger.error("FAILURE: Cannot search, Neo4j driver is not initialized.")
         return {"nodes": [], "edges": []}
     
-    logger.info(f"Searching graph for query: '{query}'")
+    logger.info(f"Searching graph for 1-hop neighborhood of: '{query}'")
     
     with driver.session() as session:
         try:
-            # Find all nodes matching the query
-            node_query = """
+            # OPTIONAL MATCH grabs the node AND anything connected to it!
+            search_query = """
             MATCH (n)
-            WHERE toLower(n.name) CONTAINS toLower($query)
-            RETURN n.id AS id, n.name AS name, labels(n)[0] AS label,
-                   coalesce(n.source_url, '') AS source_url,
-                   coalesce(n.source_title, '') AS source_title
-            LIMIT 50
+            WHERE toLower(n.name) CONTAINS toLower($search_term)
+            OPTIONAL MATCH (n)-[r]-(m)
+            RETURN 
+                n.id AS id1, n.name AS name1, labels(n)[0] AS label1, coalesce(n.source_url, '') AS url1, coalesce(n.source_title, '') AS title1,
+                type(r) AS rel_type,
+                m.id AS id2, m.name AS name2, labels(m)[0] AS label2, coalesce(m.source_url, '') AS url2, coalesce(m.source_title, '') AS title2,
+                startNode(r).id AS source_id, endNode(r).id AS target_id
+            LIMIT 300
             """
-            node_result = session.run(node_query, query=query)
-            nodes = []
-            node_ids = set()
-            for record in node_result:
-                nodes.append({
-                    "id": record["id"],
-                    "name": record["name"],
-                    "label": record["label"],
-                    "source_url": record["source_url"],
-                    "source_title": record["source_title"],
-                })
-                node_ids.add(record["id"])
+            result = session.run(search_query, search_term=query)
             
-            logger.info(f"Found {len(nodes)} matching nodes for query: '{query}'")
-            
-            if not nodes:
-                return {"nodes": [], "edges": []}
-            
-            # Find edges connecting any two of the matched nodes
-            edge_query = """
-            MATCH (a)-[r]->(b)
-            WHERE a.id IN $node_ids AND b.id IN $node_ids
-            RETURN a.id AS source, b.id AS target, type(r) AS type
-            LIMIT 200
-            """
-            edge_result = session.run(edge_query, node_ids=list(node_ids))
+            nodes_dict = {}
             edges = []
-            for record in edge_result:
-                edges.append({
-                    "source": record["source"],
-                    "target": record["target"],
-                    "type": record["type"],
-                })
+            seen_edges = set()
+
+            for record in result:
+                # Add the main searched node
+                id1 = record["id1"]
+                if id1 and id1 not in nodes_dict:
+                    nodes_dict[id1] = {
+                        "id": id1, "name": record["name1"], "label": record["label1"],
+                        "source_url": record["url1"], "source_title": record["title1"]
+                    }
+                
+                # Add the connected neighbor node (if it exists)
+                id2 = record["id2"]
+                if id2 and id2 not in nodes_dict:
+                    nodes_dict[id2] = {
+                        "id": id2, "name": record["name2"], "label": record["label2"],
+                        "source_url": record["url2"], "source_title": record["title2"]
+                    }
+                
+                # Add the edge connecting them
+                rel_type = record["rel_type"]
+                if rel_type:
+                    edge_hash = f"{record['source_id']}-{rel_type}-{record['target_id']}"
+                    if edge_hash not in seen_edges:
+                        seen_edges.add(edge_hash)
+                        edges.append({
+                            "source": record["source_id"],
+                            "target": record["target_id"],
+                            "type": rel_type
+                        })
+
+            final_nodes = list(nodes_dict.values())
+            logger.info(f"Neighborhood search complete. Found {len(final_nodes)} unique nodes and {len(edges)} edges.")
             
-            logger.info(f"Found {len(edges)} edges for matched nodes.")
-            return {"nodes": nodes, "edges": edges}
+            return {"nodes": final_nodes, "edges": edges}
         
         except Exception as e:
             logger.error(f"FAILURE during graph search: {e}")
