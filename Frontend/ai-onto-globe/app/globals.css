@@ -96,3 +96,22 @@ input[type=range]:focus::-webkit-slider-thumb {
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
+
+/* Custom Scrollbar for Palantir Aesthetic */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5); /* Deep Slate */
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(52, 211, 153, 0.4); /* Subtle Emerald */
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(52, 211, 153, 0.8); /* Bright Emerald on hover */
+}

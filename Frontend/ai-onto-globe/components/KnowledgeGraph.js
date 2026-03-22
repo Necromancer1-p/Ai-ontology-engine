@@ -1,14 +1,15 @@
 "use client";
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
-// This is the magic trick to stop Next.js from crashing!
+// This is the magic trick to stop Next.js from crashing during SSR!
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
 const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
   const containerRef = useRef(null);
   const fgRef = useRef(); 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [hoverNode, setHoverNode] = useState(null);
 
   // Ensure the graph resizes to fit its container perfectly
   useEffect(() => {
@@ -49,6 +50,47 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
     return colorPalette[index];
   };
 
+  // --- TASK 2: DEGREE CENTRALITY CALCULATION & SAFE FILTERING ---
+  const graphData = useMemo(() => {
+    const validNodeIds = new Set(data?.nodes?.map(n => n.id) || []);
+
+    // Safely filter out any "orphan" edges (Fixed the .filter crash here)
+    const safeLinks = (data?.edges || [])
+      .filter(edge => validNodeIds.has(edge.source) && validNodeIds.has(edge.target))
+      .map(edge => ({ ...edge, name: edge.type }));
+
+    // Loop through edges and count connections (Degree Centrality)
+    const edgeCounts = {};
+    safeLinks.forEach(edge => {
+      const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+      const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+      
+      edgeCounts[sourceId] = (edgeCounts[sourceId] || 0) + 1;
+      edgeCounts[targetId] = (edgeCounts[targetId] || 0) + 1;
+    });
+
+    // Assign this count as a 'val' property to each node
+    const processedNodes = data?.nodes?.map(node => {
+      return { 
+        ...node, 
+        color: getNodeColor(node.label),
+        val: edgeCounts[node.id] || 1 // Default to 1 so minor nodes don't vanish
+      };
+    }) || [];
+
+    // Hackathon Log Checks
+    const usaNodeValue = edgeCounts['USA'] || 0;
+    console.log("Calculated Centrality. Node 'USA' has value:", usaNodeValue);
+    
+    if (processedNodes.length > 0) {
+        const topNode = [...processedNodes].sort((a,b) => b.val - a.val)[0];
+        console.log(`Hackathon Trace: Top connected node is '${topNode.name}' with value:`, topNode.val);
+    }
+
+    return { nodes: processedNodes, links: safeLinks };
+  }, [data]);
+
+  // --- REAL-TIME PHYSICS UPDATES ---
   // --- THE SAFETY FILTER ---
   // 1. Create a fast-lookup Set of all the valid Node IDs the AI actually gave us
   const validNodeIds = new Set(data?.nodes?.map(n => n.id) || []);
@@ -84,16 +126,42 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
           linkDirectionalArrowLength={3.5}
           linkDirectionalArrowRelPos={1}
           
+          // TASK 4: HOVER STATE TRACKING
+          onNodeHover={(node) => {
+            setHoverNode(node);
+            if (node) {
+              console.log("Canvas Interaction: User hovered over node ->", node.name);
+            }
+          }}
+          
+          // CUSTOM CANVAS DRAWING
           nodeCanvasObject={(node, ctx, globalScale) => {
             const label = node.name;
-            const fontSize = 14 / globalScale;
-            ctx.font = `${fontSize}px Sans-Serif`;
+            
+            // Centrality visually applied here: scale font based on node.val
+            const scaledFontSize = (10 + ((node.val || 1) * 2)) / globalScale; 
+            
+            ctx.font = `${scaledFontSize}px Sans-Serif`;
             const textWidth = ctx.measureText(label).width;
-            const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); 
+            const bckgDimensions = [textWidth, scaledFontSize].map(n => n + scaledFontSize * 0.2); 
 
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; 
+            // Draw the main dark node background
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; 
             ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
 
+            // TASK 4: PREMIUM HOVER EFFECT (White Ring)
+            if (node === hoverNode) {
+              ctx.strokeStyle = '#ffffff'; 
+              ctx.lineWidth = 2 / globalScale; 
+              ctx.strokeRect(
+                node.x - bckgDimensions[0] / 2 - 2, 
+                node.y - bckgDimensions[1] / 2 - 2, 
+                bckgDimensions[0] + 4, 
+                bckgDimensions[1] + 4
+              );
+            }
+
+            // Draw the node text
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = node.color;
@@ -101,6 +169,7 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
 
             node.__bckgDimensions = bckgDimensions; 
           }}
+          
           nodePointerAreaPaint={(node, color, ctx) => {
             ctx.fillStyle = color;
             const bckgDimensions = node.__bckgDimensions;

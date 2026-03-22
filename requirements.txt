@@ -1,6 +1,6 @@
 fastapi
 uvicorn
 neo4j
-google-generativeai
+google-genai
 pydantic
 python-dotenv
