@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 // This is the magic trick to stop Next.js from crashing during SSR!
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
-const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
+const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40, onNodeClick }) => {
   const containerRef = useRef(null);
   const fgRef = useRef(); 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -91,18 +91,6 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
   }, [data]);
 
   // --- REAL-TIME PHYSICS UPDATES ---
-  // --- THE SAFETY FILTER ---
-  // 1. Create a fast-lookup Set of all the valid Node IDs the AI actually gave us
-  const validNodeIds = new Set(data?.nodes?.map(n => n.id) || []);
-
-  const graphData = {
-    nodes: data?.nodes?.map(node => ({ ...node, color: getNodeColor(node.label) })) || [],
-    
-    // 2. Filter out any "orphan" edges where the source or target node doesn't exist!
-    links: data?.edges?
-      .filter(edge => validNodeIds.has(edge.source) && validNodeIds.has(edge.target))
-      .map(edge => ({ ...edge, name: edge.type })) || [] 
-  };
 
   useEffect(() => {
     if (fgRef.current) {
@@ -132,6 +120,12 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 40 }) => {
             if (node) {
               console.log("Canvas Interaction: User hovered over node ->", node.name);
             }
+          }}
+
+          // TASK 2: NODE CLICK — triggers Evidence Panel filter
+          onNodeClick={(node) => {
+            console.log("Canvas Interaction: User clicked node ->", node.name, "| id:", node.id);
+            if (onNodeClick) onNodeClick(node);
           }}
           
           // CUSTOM CANVAS DRAWING

@@ -94,12 +94,18 @@ def insert_graph_data(driver, graph_data: dict) -> bool:
                 
                 logger.info(f"Merging node: [{safe_label}] (Original AI Label: '{raw_label}') ID: {node['id']}")
                 
+                # Extract optional provenance fields
+                source_url = node.get("source_url", "")
+                source_title = node.get("source_title", "")
+                
                 # We use backticks around the label just as an extra layer of absolute security
                 query = f"""
                 MERGE (n:`{safe_label}` {{id: $id}})
-                SET n.name = $name
+                SET n.name = $name,
+                    n.source_url = $source_url,
+                    n.source_title = $source_title
                 """
-                session.run(query, id=node["id"], name=node["name"])
+                session.run(query, id=node["id"], name=node["name"], source_url=source_url, source_title=source_title)
             
             logger.info("SUCCESS: All nodes safely inserted.")
 
@@ -124,3 +130,67 @@ def insert_graph_data(driver, graph_data: dict) -> bool:
         except Exception as e:
             logger.error(f"FAILURE during database insertion: {e}")
             return False
+
+# 6. Search Graph Function
+def search_graph(driver, query: str) -> dict:
+    """
+    Search Neo4j for nodes whose name contains 'query' (case-insensitive).
+    Returns a graph dict {nodes, edges} of matching nodes + their connected edges.
+    """
+    if not driver:
+        logger.error("FAILURE: Cannot search, Neo4j driver is not initialized.")
+        return {"nodes": [], "edges": []}
+    
+    logger.info(f"Searching graph for query: '{query}'")
+    
+    with driver.session() as session:
+        try:
+            # Find all nodes matching the query
+            node_query = """
+            MATCH (n)
+            WHERE toLower(n.name) CONTAINS toLower($query)
+            RETURN n.id AS id, n.name AS name, labels(n)[0] AS label,
+                   coalesce(n.source_url, '') AS source_url,
+                   coalesce(n.source_title, '') AS source_title
+            LIMIT 50
+            """
+            node_result = session.run(node_query, query=query)
+            nodes = []
+            node_ids = set()
+            for record in node_result:
+                nodes.append({
+                    "id": record["id"],
+                    "name": record["name"],
+                    "label": record["label"],
+                    "source_url": record["source_url"],
+                    "source_title": record["source_title"],
+                })
+                node_ids.add(record["id"])
+            
+            logger.info(f"Found {len(nodes)} matching nodes for query: '{query}'")
+            
+            if not nodes:
+                return {"nodes": [], "edges": []}
+            
+            # Find edges connecting any two of the matched nodes
+            edge_query = """
+            MATCH (a)-[r]->(b)
+            WHERE a.id IN $node_ids AND b.id IN $node_ids
+            RETURN a.id AS source, b.id AS target, type(r) AS type
+            LIMIT 200
+            """
+            edge_result = session.run(edge_query, node_ids=list(node_ids))
+            edges = []
+            for record in edge_result:
+                edges.append({
+                    "source": record["source"],
+                    "target": record["target"],
+                    "type": record["type"],
+                })
+            
+            logger.info(f"Found {len(edges)} edges for matched nodes.")
+            return {"nodes": nodes, "edges": edges}
+        
+        except Exception as e:
+            logger.error(f"FAILURE during graph search: {e}")
+            return {"nodes": [], "edges": []}

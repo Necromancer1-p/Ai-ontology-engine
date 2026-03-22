@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { extractGraphData, getInsights } from '../lib/api';
+import { extractGraphData, getInsights, searchGraph, fetchNewsGraph } from '../lib/api';
 import KnowledgeGraph from '../components/KnowledgeGraph';
 import CustomSlider from '../components/CustomSlider';
 import AlertStream from '../components/AlertStream';
-import { Network, BrainCircuit, Activity, AlertCircle, Loader2, SlidersHorizontal, Search, Filter } from 'lucide-react';
+import EvidencePanel from '../components/EvidencePanel';
+import { Network, BrainCircuit, Activity, AlertCircle, Loader2, SlidersHorizontal, Search, Filter, Rss } from 'lucide-react';
 
 // --- DYNAMIC COLOR HASHING FOR LEGEND ---
 const colorPalette = [
@@ -29,28 +30,39 @@ export default function Home() {
   const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
   const [brief, setBrief] = useState("");
   
-  // --- TASK 1: SEARCH & FILTER STATES ---
+  // --- SEARCH & FILTER STATES ---
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
+  const [isSearchingBackend, setIsSearchingBackend] = useState(false);
 
   // --- GRAPH PHYSICS STATE ---
   const [repulsion, setRepulsion] = useState(30);
   const [linkDistance, setLinkDistance] = useState(40);
   
+  // --- TASK 1: NEWS STATE ---
+  const [newsTopic, setNewsTopic] = useState("");
+  const [articles, setArticles] = useState([]);
+  const [isFetchingNews, setIsFetchingNews] = useState(false);
+
+  // --- TASK 2: EVIDENCE PANEL STATE ---
+  const [selectedNode, setSelectedNode] = useState(null);
+
   // Loading states
   const [isExtracting, setIsExtracting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
+
+  // ---- HANDLERS ----
 
   const handleExtract = async () => {
     if (!inputText.trim()) {
       setError("Please enter some text to analyze.");
       return;
     }
-    
     setIsExtracting(true);
     setError("");
     setBrief("");
+    setSelectedNode(null);
     
     try {
       const result = await extractGraphData(inputText);
@@ -69,14 +81,11 @@ export default function Home() {
 
   const handleGenerateBrief = async () => {
     if (graphData.nodes.length === 0) return;
-    
     setIsAnalyzing(true);
     setError("");
-    
     try {
       const contextData = JSON.stringify(graphData);
       const result = await getInsights("Current Intelligence Graph Situation", contextData);
-      
       if (result.status === 'success') {
         setBrief(result.brief);
       } else {
@@ -90,14 +99,76 @@ export default function Home() {
     }
   };
 
-  // Extract unique labels for our dynamic dropdown
+  // TASK 1: Fetch Live News from GDELT and extract graph
+  const handleFetchNews = async () => {
+    const topic = newsTopic.trim() || inputText.trim();
+    if (!topic) {
+      setError("Please enter a topic or paste text above first.");
+      return;
+    }
+    setIsFetchingNews(true);
+    setError("");
+    setBrief("");
+    setSelectedNode(null);
+
+    try {
+      console.log(`[page.js] Fetching live news for topic: "${topic}"`);
+      const result = await fetchNewsGraph(topic, 10);
+
+      if (result.status === 'success') {
+        if (result.data?.nodes?.length > 0) {
+          setGraphData(result.data);
+        }
+        if (result.articles?.length > 0) {
+          setArticles(result.articles);
+          console.log(`[page.js] Loaded ${result.articles.length} articles into Evidence Panel.`);
+        }
+      } else {
+        setError("News fetch succeeded but returned unexpected data.");
+      }
+    } catch (err) {
+      setError("Failed to fetch live news. Check that the backend is running.");
+      console.error(err);
+    } finally {
+      setIsFetchingNews(false);
+    }
+  };
+
+  // Extract unique labels for dropdown
   const uniqueLabels = Array.from(new Set(graphData.nodes.map(n => n.label))).filter(Boolean);
 
-  // --- TASK 1: LOGGING HANDLERS ---
+  // TASK 3: Search bar change handler — local filter
   const handleSearchChange = (e) => {
     const value = e.target.value;
     console.log("Search query updated by user:", value);
     setSearchQuery(value);
+  };
+
+  // TASK 3: Hit Enter in search bar → call /api/search on the backend
+  const handleSearchKeyDown = async (e) => {
+    if (e.key !== 'Enter') return;
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    console.log(`[page.js] Sending search query to backend: "${query}"`);
+    setIsSearchingBackend(true);
+    setError("");
+    setSelectedNode(null);
+
+    try {
+      const result = await searchGraph(query);
+      if (result.status === 'success' && result.data?.nodes?.length > 0) {
+        setGraphData(result.data);
+        console.log(`[page.js] Graph updated from backend search. Nodes: ${result.data.nodes.length}`);
+      } else {
+        // If backend search found nothing, fall back to local filtering (already handled by filteredGraphData)
+        console.log("[page.js] Backend search returned no results. Using local filter.");
+      }
+    } catch (err) {
+      console.error("[page.js] Backend search failed, falling back to local filter.", err);
+    } finally {
+      setIsSearchingBackend(false);
+    }
   };
 
   const handleCategoryChange = (e) => {
@@ -106,16 +177,19 @@ export default function Home() {
     setFilterCategory(value);
   };
 
-  // --- TASK 1: FILTERING LOGIC ---
+  // TASK 2: Node click handler — fires Evidence Panel filter
+  const handleNodeClick = (node) => {
+    console.log(`Evidence Panel updated. Showing sources for node: ${node.id}`);
+    setSelectedNode(prev => (prev?.id === node.id ? null : node)); // toggle on second click
+  };
+
+  // Local filtering logic (applied on top of whatever graphData state holds)
   const filteredGraphData = useMemo(() => {
     console.log("Filtering graph for:", searchQuery, "Category:", filterCategory);
-
-    if (!graphData.nodes || graphData.nodes.length === 0) {
-      return graphData;
-    }
+    if (!graphData.nodes || graphData.nodes.length === 0) return graphData;
 
     const filteredNodes = graphData.nodes.filter(node => {
-      const matchesSearch = node.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !searchQuery || node.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = filterCategory === "All" || node.label === filterCategory;
       return matchesSearch && matchesCategory;
     });
@@ -142,7 +216,7 @@ export default function Home() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
             Global Ontology Engine
           </h1>
-          <p className="text-slate-500 text-sm">Real-time Entity Extraction & Intelligence Mapping</p>
+          <p className="text-slate-500 text-sm">Real-time Entity Extraction &amp; Intelligence Mapping</p>
         </div>
       </header>
 
@@ -158,7 +232,7 @@ export default function Home() {
               Raw Intelligence Feed
             </h2>
             <textarea
-              className="w-full h-48 bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none mb-4 placeholder-slate-600"
+              className="w-full h-40 bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none mb-3 placeholder-slate-600"
               placeholder="Paste news articles, situational reports, or intelligence briefs here..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -167,7 +241,7 @@ export default function Home() {
             <button
               onClick={handleExtract}
               disabled={isExtracting}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-all flex justify-center items-center gap-2"
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-all flex justify-center items-center gap-2 mb-3"
             >
               {isExtracting ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processing Graph...</>
@@ -176,8 +250,34 @@ export default function Home() {
               )}
             </button>
 
+            {/* TASK 1: Live News Fetch */}
+            <div className="border-t border-slate-800 pt-3">
+              <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+                <Rss className="w-3.5 h-3.5 text-emerald-400" />
+                Or fetch live news from GDELT (free, no API key)
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Topic (e.g. DeFi Regulations)..."
+                  value={newsTopic}
+                  onChange={(e) => setNewsTopic(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleFetchNews()}
+                  className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+                <button
+                  onClick={handleFetchNews}
+                  disabled={isFetchingNews}
+                  className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded text-sm font-medium transition-all flex items-center gap-1.5"
+                >
+                  {isFetchingNews ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rss className="w-4 h-4" />}
+                  {isFetchingNews ? "Fetching..." : "Fetch"}
+                </button>
+              </div>
+            </div>
+
             {error && (
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2 text-red-400 text-sm">
+              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2 text-red-400 text-sm">
                 <AlertCircle className="w-5 h-5 shrink-0" />
                 <p>{error}</p>
               </div>
@@ -203,7 +303,7 @@ export default function Home() {
               )}
             </button>
 
-            <div className="bg-slate-950 border border-slate-700 rounded-lg p-4 h-64 overflow-y-auto text-sm text-slate-300">
+            <div className="bg-slate-950 border border-slate-700 rounded-lg p-4 h-52 overflow-y-auto text-sm text-slate-300">
               {brief ? (
                 <div className="whitespace-pre-wrap leading-relaxed">{brief}</div>
               ) : (
@@ -214,8 +314,11 @@ export default function Home() {
             </div>
           </div>
 
+          {/* TASK 2: Evidence Panel */}
+          <EvidencePanel articles={articles} selectedNode={selectedNode} />
+
           {/* Graph Physics Controls */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg flex-1">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
             <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <SlidersHorizontal className="w-5 h-5 text-emerald-400" />
               Graph Physics
@@ -238,7 +341,7 @@ export default function Home() {
             />
           </div>
 
-          {/* SIMULATED ALERT STREAM PANEL INJECTED HERE */}
+          {/* Alert Stream Panel */}
           <AlertStream nodes={filteredGraphData.nodes} />
 
         </div>
@@ -254,16 +357,21 @@ export default function Home() {
               </span>
             </h2>
 
-            {/* TASK 1: SEARCH AND FILTER UI INJECTED HERE */}
+            {/* TASK 3: Search and Filter UI */}
             <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500" />
+                {isSearchingBackend ? (
+                  <Loader2 className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500" />
+                )}
                 <input 
                   type="text" 
-                  placeholder="Search entities..." 
+                  placeholder="Search entities (Enter = query DB)..." 
                   value={searchQuery}
                   onChange={handleSearchChange}
-                  className="w-full sm:w-48 pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-700 rounded text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
+                  onKeyDown={handleSearchKeyDown}
+                  className="w-full sm:w-56 pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-700 rounded text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
                 />
               </div>
               <div className="relative">
@@ -283,11 +391,12 @@ export default function Home() {
           </div>
           
           <div className="flex-1 rounded-lg overflow-hidden border border-slate-700 relative min-h-[500px]">
-            {/* WE NOW PASS THE FILTERED DATA TO THE GRAPH */}
+            {/* TASK 2: Pass onNodeClick to KnowledgeGraph */}
             <KnowledgeGraph 
               data={filteredGraphData} 
               repulsion={repulsion} 
-              linkDistance={linkDistance} 
+              linkDistance={linkDistance}
+              onNodeClick={handleNodeClick}
             />
             
             {uniqueLabels.length > 0 && (
@@ -302,6 +411,19 @@ export default function Home() {
                     <span className="truncate max-w-[120px]" title={label}>{label}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* TASK 2: Selected Node badge */}
+            {selectedNode && (
+              <div className="absolute top-4 right-4 bg-slate-950/90 backdrop-blur-sm border border-amber-500/40 text-amber-300 text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                Evidence filtered: <strong>{selectedNode.name}</strong>
+                <button
+                  onClick={() => setSelectedNode(null)}
+                  className="ml-1 text-amber-500 hover:text-white transition-colors"
+                  title="Clear selection"
+                >✕</button>
               </div>
             )}
           </div>

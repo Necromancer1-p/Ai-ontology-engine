@@ -54,7 +54,7 @@ class KnowledgeGraphSchema(BaseModel):
     edges: list[Edge]
 
 # 5. Function to Extract Graph Data
-def extract_graph_from_text(text: str) -> dict:
+def extract_graph_from_text(text: str, source_url: str = "", source_title: str = "") -> dict:
     logger.info(f"Starting LLM extraction for text snippet (first 60 chars): {text[:60]}...")
     
     if not client:
@@ -105,6 +105,14 @@ def extract_graph_from_text(text: str) -> dict:
             
             logger.info(f"SUCCESS: Received valid JSON response from {model_name}.")
             result = json.loads(response.text)
+            
+            # Stamp provenance metadata onto every node for the Evidence Panel
+            if source_url or source_title:
+                for node in result.get("nodes", []):
+                    node["source_url"] = source_url
+                    node["source_title"] = source_title
+                logger.info(f"Provenance stamped on {len(result.get('nodes', []))} nodes. Source: '{source_title}'")
+            
             logger.info(f"Extracted {len(result.get('nodes', []))} nodes and {len(result.get('edges', []))} edges.")
             return result
             

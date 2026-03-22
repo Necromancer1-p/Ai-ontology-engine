@@ -1,0 +1,16 @@
+Target,Amount_USD,Date,Attacker,Chain,Attack_Type
+Ronin Network,625000000,2022-03-23,Lazarus Group,Ethereum,Private Key Compromise
+Poly Network,611000000,2021-08-10,Unknown,Ethereum,Smart Contract Exploit
+FTX Exchange,600000000,2022-11-11,Unknown,Ethereum,Unauthorized Access
+Binance Bridge,570000000,2022-10-06,Unknown,BSC,Cross-chain Bridge Exploit
+Coincheck,530000000,2018-01-26,Unknown,NEM,Hot Wallet Compromise
+MT Gox,470000000,2014-02-28,Unknown,Bitcoin,Internal Fraud
+Wormhole Bridge,320000000,2022-02-02,Unknown,Solana,Smart Contract Exploit
+Euler Finance,197000000,2023-03-13,Unknown,Ethereum,Flash Loan Attack
+Cream Finance,190000000,2021-10-27,Unknown,Ethereum,Flash Loan Attack
+BadgerDAO,120000000,2021-12-02,Unknown,Ethereum,Frontend Attack
+Horizon Bridge,100000000,2022-06-24,Lazarus Group,Harmony,Private Key Compromise
+Atomic Wallet,100000000,2023-06-03,Lazarus Group,Multiple,Malware
+Mixin Network,200000000,2023-09-23,Unknown,Multiple,Cloud Provider Hack
+Curve Finance,70000000,2023-07-30,Unknown,Ethereum,Reentrancy Attack
+KyberSwap,47000000,2023-11-22,Unknown,Multiple,Smart Contract Exploit

@@ -44,3 +44,32 @@ export const getInsights = async (topic, context) => {
         throw error;
     }
 };
+
+// 4. Function to search the Neo4j graph by entity name (Task 3)
+export const searchGraph = async (query) => {
+    console.log(`[API Call] Sending search query to backend: "${query}"`);
+    try {
+        const response = await apiClient.post('/api/search', { query });
+        const nodeCount = response.data?.data?.nodes?.length || 0;
+        console.log(`[API Call] Search SUCCESS: Found ${nodeCount} nodes for "${query}".`);
+        return response.data;
+    } catch (error) {
+        console.error(`[API Error] FAILURE in searchGraph:`, error.response?.data || error.message);
+        throw error;
+    }
+};
+
+// 5. Function to fetch live news + extract graph (Task 1)
+export const fetchNewsGraph = async (topic, maxArticles = 10) => {
+    console.log(`[API Call] Fetching live news for topic: "${topic}"`);
+    try {
+        const response = await apiClient.post('/api/news', { topic, max_articles: maxArticles });
+        const nodeCount = response.data?.data?.nodes?.length || 0;
+        const articleCount = response.data?.articles?.length || 0;
+        console.log(`[API Call] News fetch SUCCESS: ${articleCount} articles, ${nodeCount} graph nodes.`);
+        return response.data;
+    } catch (error) {
+        console.error(`[API Error] FAILURE in fetchNewsGraph:`, error.response?.data || error.message);
+        throw error;
+    }
+};
