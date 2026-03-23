@@ -112,23 +112,26 @@ const EvidencePanel = ({ articles = [], selectedNode = null, graphData = null })
               href={source.url}
               target="_blank"
               rel="noopener noreferrer"
-              className={`group block bg-slate-950 border ${source.isExact ? 'border-amber-500/40' : 'border-slate-700'} hover:border-amber-500/80 rounded-lg p-3 transition-all duration-200 hover:shadow-amber-900/20 hover:shadow-md relative overflow-hidden`}
+              className={`group block w-full bg-slate-950 border ${source.isExact ? 'border-amber-500/40' : 'border-slate-700'} hover:border-amber-500/80 rounded-lg p-3 transition-all duration-200 hover:shadow-amber-900/20 hover:shadow-md relative overflow-hidden`}
             >
               {/* Highlight bar for exact provenance matches */}
               {source.isExact && (
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500/80"></div>
               )}
-              
-              <div className="flex items-start justify-between gap-2 pl-1">
-                <p className="text-sm text-slate-200 group-hover:text-amber-300 font-medium leading-snug line-clamp-2 transition-colors">
+      
+              <div className="flex items-start justify-between gap-2 pl-1 w-full">
+                {/* Removed line-clamp-2 so the full title always shows */}
+                <p className="flex-1 min-w-0 text-sm text-slate-200 group-hover:text-amber-300 font-medium leading-snug break-words transition-colors">
                   {source.title || 'Untitled Source Document'}
                 </p>
                 <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400 shrink-0 mt-0.5 transition-colors" />
               </div>
-              
-              <div className="flex items-center gap-1.5 mt-2 pl-1">
-                {source.isExact && <LinkIcon className="w-3 h-3 text-amber-500" />}
-                <p className={`text-xs ${source.isExact ? 'text-amber-500/80 font-medium' : 'text-slate-500'} line-clamp-1`}>
+      
+              {/* Changed items-center to items-start so icon stays at top if snippet is multi-line */}
+              <div className="flex items-start gap-1.5 mt-2 pl-1 w-full">
+                {source.isExact && <LinkIcon className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />}
+                {/* Removed line-clamp-1 so the full snippet always shows */}
+                <p className={`flex-1 min-w-0 text-xs ${source.isExact ? 'text-amber-500/80 font-medium' : 'text-slate-500'} break-words`}>
                   {source.snippet}
                 </p>
               </div>
