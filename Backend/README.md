@@ -1,74 +1,90 @@
-# Backend - Global Ontology Engine
+# Global Ontology Engine - Backend
 
-This is the backend for the Global Ontology Engine. It's built with **FastAPI** to expose APIs that process raw intelligence text or fetch live global news using a **Google Gemini Large Language Model** via the `google-genai` library. This pipeline extracts dynamic entity (node) and relationship (edge) data into a structured JSON format. The structured data is then merged into a **Neo4j** graph database using Cypher queries. It also features endpoints to query graph intelligence and an AI Analyst Brief generator that creates situational reports based on the extracted context.
+## Overview
 
-## Capabilities
-- **Intelligence Extraction**: Parses raw text into structured knowledge graphs via the Google Gemini LLM API, validated by Pydantic schemas.
-- **Neo4j Integration**: Inserts and updates structured knowledge securely into a Neo4j database using a singleton driver instance and sanitized Cypher queries. Supports graph search via name queries.
-- **AI Analyst Briefs**: Generates multi-paragraph, AI-authored analyst briefs (including key risks) using extracted graphs.
-- **Live News Fetching**: Uses the GDELT DOC API (no key required) to pull real-time global news articles on a given topic, normalizing them into a text corpus for intelligence extraction.
-- **Bulk Data Ingestion**:
-  - `ingest.py`: A script to load `sample_data.json` through the LLM pipeline, complete with API rate-limit controls.
-  - `csv_ingest.py`: A script mapping structured datasets (`crypto_hacks.csv`) to specific Neo4j nodes (Protocol, Blockchain, ThreatActor) and edges (HACKED_BY, DEPLOYED_ON), complete with source provenance URLs.
+The Backend component of the **Global Ontology Engine** is a robust API driven by **FastAPI**. It handles parsing intelligence briefs, fetching real-time news, performing AI extractions to build comprehensive knowledge graphs, and saving that data into a Neo4j AuraDB instance.
 
-## Setup & Run Instructions
+It connects to:
+- **Google Gemini** (via `google-genai` SDK) to intelligently process raw text or expanded short queries into structured node/edge ontologies.
+- **Neo4j** (AuraDB) to persistently store nodes, edges, and provenance data (e.g., source URLs and titles) using structured Cypher queries.
+- **GDELT DOC API** to fetch free real-time global news articles.
+
+## Frontend Information
+
+This API is designed to support the **Global Ontology Engine - Frontend** (a Next.js React application). The frontend provides users with a way to:
+1. Input unstructured text and immediately visualize the extracted ontology via an interactive, physics-based D3 force graph.
+2. Fetch live news using the GDELT DOC API and visualize the extracted intelligence as a graph.
+3. Dynamically adjust the graph's rendering parameters.
+4. Request an AI-generated situational analyst brief.
+5. Trace evidence and source provenance.
+
+For more information on the frontend and how to set it up, please see the [Frontend README](../Frontend/README.md).
+
+## Key Technologies
+- **Framework:** [FastAPI](https://fastapi.tiangolo.com/)
+- **LLM Integration:** `google-genai` SDK
+- **Database:** [Neo4j Python Driver](https://neo4j.com/docs/python-manual/current/)
+- **Data Schemas:** [Pydantic](https://docs.pydantic.dev/)
+- **External Data Fetching:** `requests`
+
+## Setup & Installation
 
 ### Prerequisites
-- **Python 3.9+**
-- A **Neo4j AuraDB instance** (or local instance) with its connection URI, username, and password.
-- A **Google Gemini API Key**.
+- Python (v3.10+)
+- Pip
+- Virtual Environment (recommended)
+- A **Google Gemini API Key**
+- A **Neo4j AuraDB** Database instance (with connection URI, Username, and Password)
 
-### 1. Create a Virtual Environment
-In the root directory of this repository, create and activate a Python virtual environment:
+### Environment Variables
+To securely connect to these resources, create a `.env` file inside the `Backend` directory containing:
+```env
+# Gemini API Key
+GEMINI_API_KEY="your_google_gemini_api_key_here"
+
+# Neo4j Database Details
+NEO4J_URI="neo4j+s://your-instance-id.databases.neo4j.io"
+NEO4J_USERNAME="neo4j"
+NEO4J_PASSWORD="your_neo4j_password_here"
+```
+
+### Installation Steps
+
+1. Navigate to the `Backend` folder:
+   ```bash
+   cd Backend
+   ```
+2. Set up your Python virtual environment (optional but recommended):
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+3. Install the dependencies:
+   ```bash
+   pip install -r ../requirements.txt
+   ```
+
+## Running the Backend Application
+
+Run the FastAPI application via `uvicorn` using the following command:
 
 ```bash
-# On macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
-
-# On Windows
-python -m venv venv
-venv\Scripts\activate
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### 2. Install Dependencies
-Install the required packages using the `requirements.txt` file in the root repository.
+The API should now be running at `http://127.0.0.1:8000`. You can visit `http://127.0.0.1:8000/docs` to view the interactive Swagger API documentation.
 
-```bash
-pip install -r ../requirements.txt
-```
+## Running Data Ingestion Scripts (Bonus)
+The backend also includes powerful scripts to ingest batch data directly into the database. Make sure your `.env` is configured before running these.
 
-### 3. Environment Variables
-Create a `.env` file in the `Backend` directory and define your credentials:
-
-```ini
-NEO4J_URI=bolt://your-neo4j-uri
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your_secure_password
-GEMINI_API_KEY=your_gemini_api_key
-```
-
-### 4. Running the Backend Server
-Start the FastAPI server using `uvicorn`:
-
-```bash
-uvicorn main:app --reload
-```
-The server will now be listening on `http://127.0.0.1:8000`.
-
-### 5. Running Ingestion Scripts (Optional)
-If you wish to process the sample JSON dataset into the database via the LLM pipeline:
+### Bulk JSON Data Ingestion
+Loads textual data from `sample_data.json` and processes it via the Gemini LLM into nodes and edges before saving to Neo4j.
 ```bash
 python ingest.py
 ```
 
-If you wish to ingest the included structured CSV dataset:
+### Crypto Hacks CSV Ingestion
+Demonstrates how to integrate structured financial data (`crypto_hacks.csv`) into the unstructured knowledge graph, tracking protocols, attackers, and blockchains.
 ```bash
 python csv_ingest.py
 ```
-
----
-## Note about the Frontend
-The companion Next.js React frontend (located in `../Frontend/ai-onto-globe`) provides a modern dashboard interface that dynamically displays these real-time entity extraction graphs. The frontend renders this structured data using an interactive D3-force layout, allowing users to customize physics components like node repulsion and link distances via real-time sliders. It also interfaces with the Search, News, and Alert streams provided by the API endpoints.
-
-You can refer to the [Frontend README](../Frontend/README.md) for its specific capabilities and setup/run instructions.
