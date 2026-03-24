@@ -1,50 +1,64 @@
-# Frontend - Global Ontology Engine
+# Global Ontology Engine - Frontend
 
-This is the frontend component for the **Global Ontology Engine**, built on top of **Next.js** (App Router) and **React**. It serves as an interactive intelligence mapping dashboard, providing a seamless visual interface to extract, visualize, and analyze unstructured text into dynamic knowledge graphs.
+## Overview
 
-## Capabilities
+The Frontend component of the **Global Ontology Engine** is a modern, responsive web application built with **Next.js** and **React**. It serves as the interactive dashboard for the intelligence mapping platform, allowing users to:
 
-The frontend empowers users to interact with the backend API visually. It is built to:
-- Accept raw intelligence text or news articles and submit them to the backend API.
-- Fetch live news on a topic via the backend (`/api/news`), extracting real-time intelligence into a graph.
-- Render the resulting ontology (nodes and relationships) using an interactive 2D D3 force-directed graph (`react-force-graph-2d`).
-- Dynamically style nodes based on category classification (via hashed color mapping).
-- Provide real-time graph physics controls, allowing users to tweak D3 force parameters such as *Node Repulsion* and *Link Distance* via custom sliders.
-- Request an AI-generated analyst brief (situational report) based on the extracted graph data context, along with highlighted risks.
-- Monitor critical "High-Risk" entities or threats via the **Alert Stream** panel.
-- Trace the source of an entity or relationship using the **Evidence Panel**, which dynamically populates with the original news source or dataset link when a graph node is selected.
-- Query and retrieve nodes from the Neo4j database via the integrated **Search Graph** feature.
+1. **Input Raw Data:** Paste raw text (news, reports) into an interface for backend LLM processing.
+2. **Fetch Live News:** Search for topics to pull live data from the GDELT DOC API and process it instantly.
+3. **Interactive Visualization:** View extracted knowledge graphs in a 2D canvas utilizing `react-force-graph-2d` and D3.js physics.
+4. **Graph Controls:** Adjust physics parameters like node repulsion and link distance dynamically via sliders.
+5. **Insights & Analytics:** Generate AI-powered analyst briefs summarizing the current situation based on graph context.
+6. **Provenance Tracking:** View source information and article evidence attached to specific nodes and edges using an interactive Evidence Panel.
+7. **Search & Filtering:** Search for nodes locally or via backend calls to the Neo4j database, and filter nodes by auto-generated LLM entity categories.
 
-## Setup & Run Instructions
+## Key Technologies
+- **Framework:** [Next.js](https://nextjs.org/) (App Router)
+- **UI & Styling:** [Tailwind CSS](https://tailwindcss.com/), [Lucide React](https://lucide.dev/) (Icons)
+- **Visualization:** `react-force-graph-2d`
+- **Data Fetching:** Axios
+
+## Setup & Installation
 
 ### Prerequisites
-- **Node.js** (v18.17.0 or higher recommended)
-- **npm** (or yarn, pnpm, bun)
-- A running instance of the **Backend** (see [Backend README](../Backend/README.md) for instructions)
+- Node.js (v18.x or later)
+- npm or yarn
+- The Backend API must be running for full functionality.
 
-### 1. Install Dependencies
-Navigate into the `ai-onto-globe` folder and install the required npm packages:
+### Installation Steps
 
-```bash
-cd ai-onto-globe
-npm install
-```
+1. Navigate to the frontend application directory:
+   ```bash
+   cd ai-onto-globe
+   ```
 
-### 2. Environment Variables
-Create a `.env.local` file in the `ai-onto-globe` directory. Specify the backend API URL:
+2. Install the necessary dependencies:
+   ```bash
+   npm install
+   ```
 
-```ini
-# Fallback is http://127.0.0.1:8000
-NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
-```
+3. Configure Environment Variables:
+   Create a `.env.local` file in the `ai-onto-globe` directory and specify the URL of the Backend API.
+   ```env
+   NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+   ```
+   *(If omitted, the API service defaults to `http://127.0.0.1:8000`)*
 
-### 3. Running the Development Server
-Start the Next.js development server:
+## Running the Application
+
+Start the development server:
 
 ```bash
 npm run dev
 ```
 
-The frontend application will compile and start. Once ready, open [http://localhost:3000](http://localhost:3000) in your web browser.
+The application will typically be available at [http://localhost:3000](http://localhost:3000).
 
-You can now submit raw text intelligence or search live news within the dashboard and see the graph extract in real-time. Make sure your Python backend is also running and correctly configured to process the requests!
+## Building for Production
+
+To create an optimized production build:
+
+```bash
+npm run build
+npm start
+```
