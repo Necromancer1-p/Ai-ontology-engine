@@ -58,7 +58,7 @@ def fetch_articles(topic: str, max_records: int = 25) -> list[dict]:
             
             response = requests.get(NEWS_API_URL, params=params, headers=HEADERS, timeout=15)
             
-            # Check for 429 Too Many Requests (Rate Limiting)
+            # Check for standard HTTP Error Codes first
             if response.status_code == 429:
                 logger.warning(f"[news_fetcher] Attempt {attempt} Failed: Received 429 Too Many Requests (Rate limit hit).")
                 if attempt < max_retries:
@@ -70,16 +70,21 @@ def fetch_articles(topic: str, max_records: int = 25) -> list[dict]:
                     logger.error(f"[news_fetcher] FAILURE: Exhausted all {max_retries} retries due to rate limiting.")
                     return []
             
-            # Check for 401 Unauthorized (Bad API Key)
             if response.status_code == 401:
                 logger.error(f"[news_fetcher] FAILURE: Received 401 Unauthorized. Your API key is invalid or inactive.")
                 return []
 
-            # Check for any other HTTP errors
             response.raise_for_status()
             logger.info(f"[news_fetcher] Attempt {attempt} Successful: Received status code {response.status_code}.")
             
             data = response.json()
+            
+            # --- NEW: Catch hidden JSON errors even if Status is 200 ---
+            if data.get("status") == "error":
+                hidden_error = data.get("message", "Unknown API Error")
+                logger.error(f"[news_fetcher] API returned an embedded error: {hidden_error}")
+                return []
+            
             raw_articles = data.get("articles", [])
             
             logger.info(f"[news_fetcher] Data parsed successfully. NewsAPI returned {len(raw_articles)} raw articles.")
@@ -96,7 +101,7 @@ def fetch_articles(topic: str, max_records: int = 25) -> list[dict]:
                 source_dict = article.get("source", {})
                 source_name = source_dict.get("name") or "unknown"
                 
-                # Skip [Removed] articles (a quirk of NewsAPI where deleted articles still return empty husks)
+                # Skip [Removed] articles
                 if title == "[Removed]":
                     logger.warning(f"[news_fetcher] Skipping article {index + 1}: Article was flagged as [Removed] by NewsAPI.")
                     continue
@@ -156,7 +161,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger.info("Starting quick test run for DeFi Regulations...")
     
-    # REMEMBER TO REPLACE YOUR_NEWS_API_KEY_HERE at the top of the file before running this!
     test_articles = fetch_articles("DeFi Regulations", max_records=10)
     
     print(f"\n=== Fetched {len(test_articles)} articles ===")

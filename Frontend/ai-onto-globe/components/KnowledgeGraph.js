@@ -94,14 +94,22 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 60, onNodeClick }
 
   useEffect(() => {
     if (fgRef.current) {
-      fgRef.current.d3Force('charge').strength(-repulsion * 4); // Increased repulsion slightly for readability
-      fgRef.current.d3Force('link').distance(linkDistance*1.2);
+      // 1. Massively increase repulsion so nodes spread out
+      fgRef.current.d3Force('charge').strength(-repulsion * 15).distanceMax(800);
+      
+      // 2. Dynamically calculate edge length based on the text length of the relationship
+      fgRef.current.d3Force('link').distance(link => {
+        const labelLength = link.name ? link.name.length : 0;
+        // Base distance + 4.5 pixels per character to ensure text doesn't overlap nodes
+        return linkDistance + (labelLength * 4.5);
+      });
+
       fgRef.current.d3ReheatSimulation();
     }
   }, [repulsion, linkDistance, graphData]);
 
   return (
-    <div ref={containerRef} className="w-full h-full  bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-700">
+    <div ref={containerRef} className="w-full h-full bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-700">
       {graphData.nodes.length > 0 ? (
         <ForceGraph2D
           ref={fgRef} 
@@ -160,12 +168,12 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 60, onNodeClick }
             if (onNodeClick) onNodeClick(node);
           }}
           
-// CUSTOM CANVAS DRAWING FOR SOLID NODES + EXTERNAL TEXT
+          // CUSTOM CANVAS DRAWING FOR SOLID NODES + EXTERNAL TEXT
           nodeCanvasObject={(node, ctx, globalScale) => {
             const label = node.name || "";
             
-            // Calculate a fixed radius. Centrality makes more connected nodes slightly bigger.
-            const radius = 4 + ((node.val || 1) * 0.5);
+            // INCREASED NODE SIZE: Multiply centrality by a larger factor so hubs visually dominate
+            const radius = 5 + ((node.val || 1) * 1.5);
 
             // 1. Draw the solid circular node using its assigned color
             ctx.beginPath();
@@ -176,9 +184,9 @@ const KnowledgeGraph = ({ data, repulsion = 30, linkDistance = 60, onNodeClick }
             // TASK 4: PREMIUM HOVER EFFECT (White Circular Ring)
             if (node === hoverNode) {
               ctx.beginPath();
-              ctx.arc(node.x, node.y, radius + 2, 0, 2 * Math.PI, false);
+              ctx.arc(node.x, node.y, radius + 2.5, 0, 2 * Math.PI, false);
               ctx.strokeStyle = '#ffffff'; 
-              ctx.lineWidth = 1; 
+              ctx.lineWidth = 1.5; 
               ctx.stroke();
             }
 

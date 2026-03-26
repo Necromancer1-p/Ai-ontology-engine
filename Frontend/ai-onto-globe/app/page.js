@@ -6,7 +6,7 @@ import KnowledgeGraph from '../components/KnowledgeGraph';
 import CustomSlider from '../components/CustomSlider';
 import AlertStream from '../components/AlertStream';
 import EvidencePanel from '../components/EvidencePanel';
-import { Network, BrainCircuit, Activity, AlertCircle, Loader2, SlidersHorizontal, Search, Filter, Rss, Layers } from 'lucide-react';
+import { Network, BrainCircuit, Activity, AlertCircle, Loader2, SlidersHorizontal, Search, Filter, Rss, Layers, Lock, Unlock } from 'lucide-react';
 
 // --- DYNAMIC COLOR HASHING FOR LEGEND ---
 const colorPalette = [
@@ -38,6 +38,7 @@ export default function Home() {
   // --- GRAPH PHYSICS STATE ---
   const [repulsion, setRepulsion] = useState(30);
   const [linkDistance, setLinkDistance] = useState(40);
+  const [isPhysicsUnlocked, setIsPhysicsUnlocked] = useState(false); // NEW STATE
   
   // --- TASK 1: NEWS STATE ---
   const [newsTopic, setNewsTopic] = useState("");
@@ -63,6 +64,7 @@ export default function Home() {
       return;
     }
     setIsExtracting(true);
+    setIsPhysicsUnlocked(false); // Lock physics during extraction
     setError("");
     setBrief("");
     setSelectedNode(null);
@@ -102,7 +104,7 @@ export default function Home() {
     }
   };
 
-  // TASK 1: Fetch Live News from GDELT and extract graph
+  // TASK 1: Fetch Live News from NewsAPI and extract graph
   const handleFetchNews = async () => {
     const topic = newsTopic.trim() || inputText.trim();
     if (!topic) {
@@ -110,6 +112,7 @@ export default function Home() {
       return;
     }
     setIsFetchingNews(true);
+    setIsPhysicsUnlocked(false); // Lock physics during fetching
     setError("");
     setBrief("");
     setSelectedNode(null);
@@ -147,10 +150,8 @@ export default function Home() {
     setSearchQuery(value);
   };
 
-  // TASK 3: Hit Enter in search bar → call /api/search on the backend
+  // TASK 3: Hit Enter in search bar
   const handleSearchKeyDown = (e) => {
-    // Prevent any backend fetching or page reloads when hitting Enter.
-    // We are now relying entirely on the local real-time filtering!
     if (e.key === 'Enter') {
       e.preventDefault(); 
     }
@@ -165,10 +166,10 @@ export default function Home() {
   // TASK 2: Node click handler — fires Evidence Panel filter
   const handleNodeClick = (node) => {
     console.log(`Evidence Panel updated. Showing sources for node: ${node.id}`);
-    setSelectedNode(prev => (prev?.id === node.id ? null : node)); // toggle on second click
+    setSelectedNode(prev => (prev?.id === node.id ? null : node)); 
   };
 
-  // Local filtering logic (applied on top of whatever graphData state holds)
+  // Local filtering logic
   const filteredGraphData = useMemo(() => {
     console.log("Filtering graph for:", searchQuery, "Category:", filterCategory);
     if (!graphData.nodes || graphData.nodes.length === 0) return graphData;
@@ -239,7 +240,7 @@ export default function Home() {
             <div className="border-t border-slate-800 pt-3">
               <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
                 <Rss className="w-3.5 h-3.5 text-emerald-400" />
-                Or fetch live news from GDELT (free, no API key)
+                Or fetch live news (via NewsAPI)
               </p>
               <div className="flex gap-2">
                 <input
@@ -299,7 +300,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* TASK 2: Evidence Panel - FIXED TO PASS GRAPHDATA */}
+          {/* TASK 2: Evidence Panel */}
           <EvidencePanel 
             articles={articles} 
             selectedNode={selectedNode} 
@@ -307,27 +308,69 @@ export default function Home() {
           />
 
           {/* Graph Physics Controls */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <SlidersHorizontal className="w-5 h-5 text-emerald-400" />
-              Graph Physics
+          {/* Added min-h-[220px] and flex-col to prevent the absolute overlay from being cut off */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg relative overflow-hidden min-h-[220px] flex flex-col">
+            <h2 className="text-lg font-semibold mb-3 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-5 h-5 text-emerald-400" />
+                Graph Physics
+              </div>
+              {isPhysicsUnlocked && (
+                <button 
+                  onClick={() => setIsPhysicsUnlocked(false)}
+                  className="text-slate-500 hover:text-rose-400 transition-colors"
+                  title="Lock Physics"
+                >
+                  <Lock className="w-4 h-4" />
+                </button>
+              )}
             </h2>
-            <CustomSlider 
-              label="Node Repulsion" 
-              min={10} 
-              max={150} 
-              step={5} 
-              value={repulsion} 
-              onChange={setRepulsion} 
-            />
-            <CustomSlider 
-              label="Link Distance" 
-              min={10} 
-              max={150} 
-              step={5} 
-              value={linkDistance} 
-              onChange={setLinkDistance} 
-            />
+
+            {/* The Sliders */}
+            <div className={!isPhysicsUnlocked ? "opacity-30 pointer-events-none filter blur-[1px] transition-all duration-300 flex-1" : "transition-all duration-300 flex-1"}>
+              <CustomSlider 
+                label="Node Repulsion" 
+                min={10} 
+                max={150} 
+                step={5} 
+                value={repulsion} 
+                onChange={setRepulsion} 
+              />
+              <CustomSlider 
+                label="Link Distance" 
+                min={10} 
+                max={150} 
+                step={5} 
+                value={linkDistance} 
+                onChange={setLinkDistance} 
+              />
+            </div>
+
+            {/* TRANSLUCENT OVERLAY WHEN LOCKED */}
+            {!isPhysicsUnlocked && (
+              <div className="absolute top-14 bottom-0 left-0 right-0 z-10 bg-slate-950/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center">
+                {(isExtracting || isFetchingNews) ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+                    <p className="text-sm font-medium text-slate-300">Processing Graph...</p>
+                  </div>
+                ) : graphData.nodes.length > 0 ? (
+                  <div className="flex flex-col items-center gap-3 bg-slate-900/90 p-3 rounded-lg border border-slate-700 shadow-xl">
+                    <Lock className="w-5 h-5 text-slate-400" />
+                    <p className="text-sm font-medium text-slate-300">Physics locked for stability.</p>
+                    <button
+                      onClick={() => setIsPhysicsUnlocked(true)}
+                      className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/50 text-emerald-400 rounded-md text-sm font-medium transition-all flex items-center gap-2"
+                    >
+                      <Unlock className="w-4 h-4" />
+                      Tweak Physics
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm font-medium text-slate-500">Extract a graph to unlock controls.</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Alert Stream Panel */}

@@ -76,6 +76,12 @@ def extract_graph_from_text(text: str, source_url: str = "", source_title: str =
         You are an elite intelligence analyst. The user has provided a short topic or search query. 
         Do NOT just extract the literal words. Instead, use your vast internal knowledge to EXPAND on this topic.
         Build a comprehensive, highly detailed intelligence graph (aiming for 10-15 nodes) that maps out the key organizations, people, locations, events, and technologies related to this topic.
+        
+        CRITICAL TOPOLOGY RULES:
+        1. Build a highly interconnected "hub-and-spoke" graph.
+        2. DO NOT create isolated, floating nodes or disconnected pairs.
+        3. Tie all secondary entities explicitly back to central hubs (the main topic, key organizations, or key people).
+        
         Create specific, context-aware categories for entities (Node labels) and precise relationship descriptions (Edge types).
         
         Topic to expand:
@@ -85,6 +91,12 @@ def extract_graph_from_text(text: str, source_url: str = "", source_title: str =
         logger.info("ROUTER: Long input detected. Engaging standard INFORMATION EXTRACTION MODE.")
         prompt = f"""
         You are an elite intelligence analyst. Read the following text and extract the key entities and their relationships to build a dynamic intelligence graph.
+        
+        CRITICAL TOPOLOGY RULES:
+        1. Build a highly interconnected graph.
+        2. DO NOT create isolated, floating nodes or disconnected pairs. 
+        3. If a minor entity is mentioned, you MUST figure out how it relates to the central themes, organizations, or people in the text and create an edge connecting them.
+        
         Create specific, context-aware categories for entities (Node labels) and precise relationship descriptions (Edge types).
         Strictly rely on the provided text for your extraction.
         

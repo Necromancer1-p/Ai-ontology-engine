@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
+import hashlib
 from typing import Dict, Any
 
 # Import our custom modules
@@ -74,6 +75,10 @@ def extract_entities(request: ExtractRequest):
         
         if insertion_success:
             logger.info("SUCCESS: Data successfully saved to Neo4j.")
+            # Clear caches to ensure fresh briefs and searches on next request
+            search_cache.clear()
+            insight_cache.clear()
+            logger.info("Caches cleared due to new database ingestion.")
         else:
             logger.error("FAILURE: Data extraction succeeded, but database insertion failed.")
             raise HTTPException(status_code=500, detail="Failed to save graph data to the database.")
@@ -92,22 +97,24 @@ def extract_entities(request: ExtractRequest):
 def get_insights(request: InsightRequest):
     logger.info(f"Endpoint '/api/insights' called for topic: {request.topic}")
     
-    # Check the cache first
-    cache_key = request.topic.lower().strip()
+    # Check the cache first - Create a unique hash of the context data
+    context_hash = hashlib.md5(request.context.encode('utf-8')).hexdigest()
+    cache_key = f"{request.topic.lower().strip()}_{context_hash}"
+    
     if cache_key in insight_cache:
-        logger.info(f"CACHE HIT: Returning AI brief for '{request.topic}' instantly from memory.")
+        logger.info(f"CACHE HIT: Returning AI brief instantly from memory for current context signature.")
         return {
             "status": "success",
             "brief": insight_cache[cache_key]
         }
         
     try:
-        logger.info("CACHE MISS: Calling LLM for analyst brief generation...")
+        logger.info("CACHE MISS: Context changed or not found. Calling LLM for new analyst brief generation...")
         brief = generate_analyst_brief(request.topic, request.context)
         
-        # Save the result to cache for future requests
+        # Save the result to cache for future requests using the unique signature
         insight_cache[cache_key] = brief
-        logger.info(f"SUCCESS: Brief generated and securely stored in cache for '{request.topic}'.")
+        logger.info(f"SUCCESS: Brief generated and securely stored in cache.")
         
         return {
             "status": "success",
@@ -126,14 +133,14 @@ def ingest_news(request: NewsRequest):
         raise HTTPException(status_code=400, detail="Topic cannot be empty.")
     
     try:
-        logger.info("Fetching live news articles from GDELT...")
+        logger.info("Fetching live news articles from NewsAPI...")
         articles = fetch_articles(request.topic, max_records=request.max_articles)
         
         if not articles:
-            logger.warning(f"No articles found for topic: '{request.topic}'")
+            logger.warning(f"No articles found on NewsAPI for topic: '{request.topic}'")
             return {
                 "status": "success",
-                "message": "No articles found for this topic. Try a broader search.",
+                "message": f"No articles found for '{request.topic}'. The query might be too specific or regional for the global feed. Try a broader search.",
                 "articles": [],
                 "data": {"nodes": [], "edges": []}
             }
@@ -158,9 +165,10 @@ def ingest_news(request: NewsRequest):
         
         if insertion_success:
             logger.info(f"SUCCESS: News ingestion complete. {len(graph_data.get('nodes', []))} nodes stored.")
-            # Optional: Clear search cache since the database has changed, ensuring fresh data
+            # Clear caches since the database has changed, ensuring fresh data and fresh briefs
             search_cache.clear()
-            logger.info("Search cache cleared due to new database ingestion.")
+            insight_cache.clear()
+            logger.info("Search and insight caches cleared due to new database ingestion.")
         else:
             logger.error("FAILURE: Graph extraction succeeded but database insertion failed.")
 
