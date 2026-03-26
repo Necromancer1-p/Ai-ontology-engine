@@ -45,7 +45,7 @@ def fetch_articles(topic: str, max_records: int = 25) -> list[dict]:
         "q": topic,                 # Search query
         "pageSize": max_records,    # Number of results to return
         "language": "en",           # English articles only
-        "sortBy": "publishedAt",    # Most recent first
+        "sortBy": "relevancy",      # <-- FIXED: Force highly relevant articles instead of newest digests
         "apiKey": API_KEY           # Authentication
     }
 
@@ -79,7 +79,7 @@ def fetch_articles(topic: str, max_records: int = 25) -> list[dict]:
             
             data = response.json()
             
-            # --- NEW: Catch hidden JSON errors even if Status is 200 ---
+            # Catch hidden JSON errors even if Status is 200
             if data.get("status") == "error":
                 hidden_error = data.get("message", "Unknown API Error")
                 logger.error(f"[news_fetcher] API returned an embedded error: {hidden_error}")
