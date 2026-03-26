@@ -146,18 +146,16 @@ def ingest_news(request: NewsRequest):
             }
         
         logger.info(f"Fetched {len(articles)} articles. Starting LLM extraction pipeline...")
-        text_corpus = articles_to_text_corpus(articles)
-        combined_text = "\n\n".join(text_corpus[:5]) 
         
-        logger.info(f"Combined text corpus length: {len(combined_text)} characters. Calling LLM...")
+        # --- FIXED: Format the text sent to the LLM to explicitly include URLs ---
+        combined_text = "Here are the live news sources to analyze:\n\n"
+        for i, art in enumerate(articles[:5]):
+            combined_text += f"--- SOURCE {i+1} ---\nTITLE: {art['title']}\nURL: {art['url']}\nCONTENT: {art['snippet']}\n\n"
         
-        first_url = articles[0]["url"] if articles else ""
-        first_title = articles[0]["title"] if articles else ""
-        graph_data = extract_graph_from_text(
-            combined_text,
-            source_url=first_url,
-            source_title=first_title
-        )
+        logger.info(f"Combined text corpus length: {len(combined_text)} characters. Calling LLM with explicit source tracking...")
+        
+        # --- FIXED: Let the LLM map the correct sources instead of overwriting them all ---
+        graph_data = extract_graph_from_text(combined_text)
         
         logger.info("Inserting extracted graph data into Neo4j...")
         db_driver = get_db()

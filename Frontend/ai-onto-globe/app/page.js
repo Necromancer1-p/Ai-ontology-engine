@@ -374,7 +374,10 @@ export default function Home() {
           </div>
 
           {/* Alert Stream Panel */}
-          <AlertStream nodes={filteredGraphData.nodes} />
+          <AlertStream 
+            nodes={filteredGraphData.nodes} 
+            articles={articles} 
+          />
 
         </div>
 

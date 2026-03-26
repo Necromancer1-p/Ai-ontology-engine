@@ -43,22 +43,23 @@ class Node(BaseModel):
     id: str = Field(description="Unique ID, uppercase with underscores, e.g., ETHEREUM, VITALIK_BUTERIN, USA")
     label: str = Field(description="Determine the most accurate category for the entity (e.g., Technology, Cryptocurrency, Company, Person, Market, Country, Event).")
     name: str = Field(description="Clean, human-readable name")
-    source_url: str = Field(default="", description="Provenance tracking: Source URL")
-    source_title: str = Field(default="", description="Provenance tracking: Source Title")
+    source_url: str = Field(default="", description="The exact URL of the source article where this entity was found.")
+    source_title: str = Field(default="", description="The exact Title of the source article where this entity was found.")
 
 class Edge(BaseModel):
     source: str = Field(description="The ID of the source node")
     target: str = Field(description="The ID of the target node")
     type: str = Field(description="Generate a highly specific relationship type in UPPERCASE_WITH_UNDERSCORES (e.g., PARTNERED_WITH, INTEGRATES_WITH, FOUNDED_BY, THREATENS).")
-    source_url: str = Field(default="", description="Provenance tracking: Source URL")
-    source_title: str = Field(default="", description="Provenance tracking: Source Title")
+    source_url: str = Field(default="", description="The exact URL of the source article proving this relationship.")
+    source_title: str = Field(default="", description="The exact Title of the source article proving this relationship.")
 
 class KnowledgeGraphSchema(BaseModel):
     nodes: list[Node]
     edges: list[Edge]
 
 # 5. Function to Extract Graph Data
-def extract_graph_from_text(text: str, source_url: str = "", source_title: str = "") -> dict:
+# --- FIXED: Removed source_url and source_title parameters, LLM handles it now ---
+def extract_graph_from_text(text: str) -> dict:
     logger.info(f"Starting LLM extraction for text snippet (first 60 chars): {text[:60]}...")
     
     if not client:
@@ -90,7 +91,12 @@ def extract_graph_from_text(text: str, source_url: str = "", source_title: str =
     else:
         logger.info("ROUTER: Long input detected. Engaging standard INFORMATION EXTRACTION MODE.")
         prompt = f"""
-        You are an elite intelligence analyst. Read the following text and extract the key entities and their relationships to build a dynamic intelligence graph.
+        You are an elite intelligence analyst. Read the following text, which contains multiple distinct news sources.
+        Extract the key entities and their relationships to build a dynamic intelligence graph.
+        
+        CRITICAL PROVENANCE RULE: 
+        You will see texts labeled with "--- SOURCE X ---", "TITLE:", and "URL:". 
+        For EVERY Node and EVERY Edge you extract, you MUST accurately fill in the `source_title` and `source_url` fields based on the specific source that entity or relationship came from. Do not mix them up. If the text has no explicit URL, leave it blank.
         
         CRITICAL TOPOLOGY RULES:
         1. Build a highly interconnected graph.
@@ -122,21 +128,8 @@ def extract_graph_from_text(text: str, source_url: str = "", source_title: str =
             logger.info(f"SUCCESS: Received valid JSON response from {model_name}.")
             result = json.loads(response.text)
             
-            # Stamp provenance metadata onto every node AND edge for the Evidence Panel
-            if source_url or source_title:
-                for node in result.get("nodes", []):
-                    node["source_url"] = source_url
-                    node["source_title"] = source_title
-                logger.info(f"Provenance stamped on {len(result.get('nodes', []))} nodes. Source: '{source_title}'")
-                
-                for edge in result.get("edges", []):
-                    edge["source_url"] = source_url
-                    edge["source_title"] = source_title
-                    # Log check requirement for Edge Provenance
-                    logger.info(f"Attached source URL to edge: ({edge.get('source')}) -> ({edge.get('target')})")
-                logger.info(f"Provenance stamped on {len(result.get('edges', []))} edges.")
-            
-            logger.info(f"Extracted {len(result.get('nodes', []))} nodes and {len(result.get('edges', []))} edges.")
+            # --- FIXED: Removed the manual overwrite loop. The LLM intelligently maps sources now. ---
+            logger.info(f"Extracted {len(result.get('nodes', []))} nodes and {len(result.get('edges', []))} edges. Native provenance mapping applied.")
             return result
             
         except Exception as e:
